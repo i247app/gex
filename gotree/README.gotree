@@ -1,0 +1,119 @@
+below are the one and two repos version
+
+//
+// A - TWO repos version
+// repo go_svr // server code
+//
+go_svr/
+├── internal/
+│   ├── server/        // Core server functionality (reusable)
+│   │   ├── server.go
+│   │   └── server_config.go
+│   ├── session/       // Session management (reusable)
+│   │   ├── session.go
+│   │   └── session_manager.go
+│   ├── service/       // Service definitions and common code (internal) - framework
+│   │   ├── service.go // Defines service interfaces, common utilities
+│   ├── database/       // Database connection management (reusable)
+│   │   ├── db.go
+│   │   ├── mysql/
+│   │   │   └── mysql.go
+│   │   ├── postgresql/
+│   │   │   └── postgresql.go
+│   │   ├── mongodb/
+│   │   │   └── mongodb.go
+├── pkg/             // Public packages
+│   ├── server/        // Re-exported server package
+│   │   └── server.go
+│   ├── session/       // Re-exported session package
+│   │   ├── session.go
+│   │   └── session_manager.go
+├── go.mod
+└── go.sum
+
+//
+// B - ONE repo version
+// repo app_svr / application code
+//
+app_svr/
+├── internal/ 
+│   ├── common/
+│   │   ├── config.go
+│   │   ├── logger.go 
+├── cmd/                 // Application entry points
+│   ├── app1/
+│   │   ├── main.go      // run application
+│   │   ├── demo_run.go  // run demo
+│   │   ├── demo/        // demo
+│   │   │   ├── demo.go
+│   │   ├── service/    // Application-specific services
+│   │   │   ├── login/
+│   │   │   │   ├── login.go
+│   │   │   │   └── login_repository.go
+│   │   │   ├── logout/
+│   │   │   │   └── logout.go
+│   │   │   ├── echo/
+│   │   │   │   └── secure_echo.go
+│   │   │   ├── time/
+│   │   │   │   └── secure_time.go
+│   │   │   ├── whoami/
+│   │   │   │   └── whoami.go
+│   ├── app2/
+│   │   └── main.go
+├── go.mod
+└── go.sum
+
+
+one repo version
+
+go_svr/
+├── internal/
+│   ├── server/        // Core server functionality (reusable)
+│   │   ├── server.go
+│   │   └── server_config.go
+│   ├── session/       // Session management (reusable)
+│   │   ├── session.go
+│   │   └── session_manager.go
+│   ├── service/       // Service definitions and common code (internal) - framework
+│   │   ├── service.go // Defines service interfaces, common utilities
+│   ├── database/       // Database connection management (reusable)
+│   │   ├── db.go
+│   │   ├── mysql/
+│   │   │   └── mysql.go
+│   │   ├── postgresql/
+│   │   │   └── postgresql.go
+│   │   ├── mongodb/
+│   │   │   └── mongodb.go
+├── pkg/             // Public packages
+│   ├── server/        // Re-exported server package
+│   │   └── server.go
+│   ├── session/       // Re-exported session package
+│   │   ├── session.go
+│   │   └── session_manager.go
+app_svr/
+├── internal/ 
+│   ├── common/
+│   │   ├── config.go
+│   │   ├── logger.go 
+├── cmd/                 // Application entry points
+│   ├── app1/
+│   │   ├── main.go      // run application
+│   │   ├── demo_run.go  // run demo
+│   │   ├── demo/        // demo
+│   │   │   ├── demo.go
+│   │   ├── service/    // Application-specific services
+│   │   │   ├── login/
+│   │   │   │   ├── login.go
+│   │   │   │   └── login_repository.go
+│   │   │   ├── logout/
+│   │   │   │   └── logout.go
+│   │   │   ├── echo/
+│   │   │   │   └── secure_echo.go
+│   │   │   ├── time/
+│   │   │   │   └── secure_time.go
+│   │   │   ├── whoami/
+│   │   │   │   └── whoami.go
+│   ├── app2/
+│   │   └── main.go
+├── go.mod
+└── go.sum
