@@ -1,0 +1,74 @@
+// gosvr_svr/internal/server/server.go
+package server
+
+import (
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/yourusername/gosvr_svr/internal/session" // Corrected import
+	"database/sql"
+)
+
+// Server struct and methods...
+type Server struct {
+	addr    string
+	handler http.Handler
+	sessionManager *session.SessionManager
+	services map[string]AuthenticatedServiceHandlerFunc // Use the typealias
+	db     *sql.DB                                     // Add database connection pool
+}
+
+// NewServer creates a new server instance.
+func NewServer(addr string, sm *session.SessionManager, db *sql.DB) *Server { // Add db
+	return &Server{
+		addr:           addr,
+		handler:        http.DefaultServeMux, // Or your custom mux
+		sessionManager: sm,
+		services:       make(map[string]AuthenticatedServiceHandlerFunc),
+		db:             db, // Initialize db
+	}
+}
+
+// RegisterService registers a service handler.
+func (s *Server) RegisterService(name string, handler AuthenticatedServiceHandlerFunc) {
+	s.services[name] = handler
+	http.HandleFunc("/"+name, s.authMiddleware(handler)) // Use authMiddleware here
+}
+
+type AuthenticatedServiceHandlerFunc func(http.ResponseWriter, *http.Request, *session.Session)
+
+func (s *Server) authMiddleware(next AuthenticatedServiceHandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := r.Header.Get("Authorization")
+		if token == "" {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte("Unauthorized: No token provided"))
+			return
+		}
+		if len(token) > 7 && token[:7] == "Bearer " {
+			token = token[7:]
+		}
+
+		sess := s.sessionManager.GetSession(token)
+		if sess == nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte("Unauthorized: Invalid or expired token"))
+			return
+		}
+
+		// Call the next handler with the session
+		next(w, r, sess)
+	}
+}
+
+// Start starts the server.
+func (s *Server) Start() error {
+	log.Printf("Server listening on %s\n", s.addr)
+	return http.ListenAndServe(s.addr, s.handler)
+}
+
+// GetDB returns the database connection pool.
+func (s *Server) GetDB() *sql.DB { // Added getter
+	return s.db
+}

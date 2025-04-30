@@ -1,0 +1,202 @@
+// pkg/server/server.go
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"reflect"
+	"runtime"
+	"strings"
+	"syscall"
+	"time"
+
+	"github.com/joho/godotenv"
+	"github.com/golang-jwt/jwt/v5"
+	"../session"
+	"../service"
+	"../database"
+)
+
+// SessionManager instance (global for simplicity)
+var sessionManager *session.SessionManager
+
+func init() {
+	sessionManager = session.NewSessionManager(5*time.Minute, "your-jwt-secret", "node1") // Add JWT secret and nodeID
+	// Initialize with a sample secure session
+	now := jwt.NewNumericDate(time.Now())
+	secureSession := session.NewSession("secure-token", true, &[]string{"user1"}[0], now.Add(time.Hour))
+	sessionManager.SetSession(secureSession)
+	// Initialize with a sample non-secure session
+	anonymousSession := session.NewSession("anonymous-token", false, nil, now.Add(30*time.Minute))
+	sessionManager.SetSession(anonymousSession)
+}
+
+// Define a type for our service handlers that now accept a *session.Session.
+type AuthenticatedServiceHandlerFunc func(http.ResponseWriter, *http.Request, *session.Session)
+
+func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := r.Header.Get("Authorization")
+		if token == "" {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Unauthorized: No token provided"})
+			return
+		}
+		if len(token) > 7 && token[:7] == "Bearer " {
+			token = token[7:]
+		}
+
+		sess := sessionManager.GetSession(token)
+		if sess == nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Unauthorized: Invalid or expired token"})
+			return
+		}
+
+		// Call the next handler with the session
+		next(w, r, sess)
+	}
+}
+
+func requestHandler(w http.ResponseWriter, r *http.Request) {
+	// Extract the service name from the URL path.
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 2 || parts[1] == "" {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Service not found"})
+		return
+	}
+	serviceName := parts[1] // e.g., "login", "logout", "secure_echo", "whoami"
+
+	// Construct the handler function name.
+	handlerFuncName := "Handle" + strings.Title(serviceName) // e.g., "HandleLogin", "HandleLogout", "HandleSecureEcho", "HandleWhoami"
+
+	// Use reflection to get the handler function.
+	handlerFuncValue := reflect.ValueOf(service.GetServiceHandler(handlerFuncName))
+
+	if handlerFuncValue.Kind() == reflect.Func {
+		// Convert the reflect.Value to an AuthenticatedServiceHandlerFunc.
+		handlerFunc := handlerFuncValue.Interface().(AuthenticatedServiceHandlerFunc)
+
+		authMiddleware(func(w http.ResponseWriter, r *http.Request, sess *session.Session) {
+			// Invoke the handler, passing the session in a goroutine
+			go handlerFunc(w, r, sess)
+		}).ServeHTTP(w, r)
+	} else {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Service not found"})
+		return
+	}
+}
+
+func runServer(server *http.Server, certFile, keyFile string) error {
+	// Listen for shutdown signals
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	// Start the server in separate goroutine
+	go func() {
+		fmt.Printf("Server running on %s\n", server.Addr)
+
+		var err error
+
+		fmt.Println("Starting http")
+		err = server.ListenAndServe()
+
+		if certFile != "" && keyFile != "" {
+			httpsServer := &http.Server{
+				Addr:    ":8443", // Default HTTPS port
+				Handler: server.Handler,
+			}
+			fmt.Println("Starting https on :8443")
+			go func() {
+				err := httpsServer.ListenAndServeTLS(certFile, keyFile)
+				if err != nil && err != http.ErrServerClosed {
+					fmt.Printf("HTTPS server failed: %v\n", err)
+				}
+			}()
+		}
+
+		if err != nil && err != http.ErrServerClosed {
+			fmt.Printf("HTTP server failed: %v\n", err)
+		}
+	}()
+
+	// Wait for shutdown signal
+	<-ctx.Done()
+	fmt.Println("Shutting down server...")
+
+	// Create a timeout context for graceful shutdown
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Shutdown the server
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		fmt.Printf("Server shutdown error: %v\n", err)
+	}
+	// Close the database connection pool when the server shuts down.
+	database.CloseDB()
+	return nil
+}
+
+func main() {
+	//Print number of Goroutines
+	fmt.Printf("Number of Goroutines: %d\n", runtime.NumGoroutine())
+	server := &http.Server{
+		Addr:    ":8080", // Default HTTP port
+		Handler: http.HandlerFunc(requestHandler),
+	}
+
+	certFile := "server.crt" // Replace with your SSL certificate file path
+	keyFile := "server.key"   // Replace with your SSL key file path
+
+	// Check if certificate and key files exist
+	if _, err := os.Stat(certFile); os.IsNotExist(err) {
+		fmt.Println("Warning: SSL certificate file not found. HTTPS will not be started.")
+		certFile = ""
+		keyFile = ""
+	}
+	if _, err := os.Stat(keyFile); os.IsNotExist(err) {
+		fmt.Println("Warning: SSL key file not found. HTTPS will not be started.")
+		certFile = ""
+		keyFile = ""
+	}
+
+	// Load configuration from .env file
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
+	}
+
+	// Initialize database connection pool.  Load config from .env file.
+	dbCfg := database.Config{
+		Username:     os.Getenv("DB_USER"),
+		Password:     os.Getenv("DB_PASSWORD"),
+		Host:         os.Getenv("DB_HOST"),
+		Port:         os.Getenv("DB_PORT"),
+		DatabaseName: os.Getenv("DB_NAME"),
+		MinPoolSize:  10,
+		MaxPoolSize:  100,
+		MaxLifetime:  time.Hour,
+	}
+
+	//check if required env variables are set
+	if dbCfg.Username == "" || dbCfg.Password == "" || dbCfg.Host == "" || dbCfg.Port == "" || dbCfg.DatabaseName == "" {
+		log.Fatal("Missing required MySQL environment variables")
+	}
+
+	err = database.InitDB(dbCfg)
+	if err != nil {
+		log.Fatalf("Error initializing database: %v", err)
+	}
+
+	err = runServer(server, certFile, keyFile)
+	if err != nil {
+		fmt.Println("Error running server:", err)
+	}
+}
