@@ -1,25 +1,186 @@
-# If you prefer the allow list template instead of the deny list, see community template:
-# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
-#
-# Binaries for programs and plugins
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-
-# Test binary, built with `go test -c`
-*.test
-
-# Output of the go coverage tool, specifically when used with LiteIDE
-*.out
-
-# Dependency directories (remove the comment below to include it)
-# vendor/
+# Custom Start Here
+.air.toml
 
 # Go workspace file
 go.work
 go.work.sum
 
 # env file
-.env
+.env*
+!.env.*example
+
+# Custom End Here
+
+# Standard gitignore Below
+
+# Miscellaneous (Applies at a higher level)
+*.class
+*.log
+*.pyc
+*.swp
+*.swo
+*.bak
+*.orig
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+*.lock
+*.podspec
+*.un~
+*.textClipping
+
+# Security (Sensitive files - be cautious!)
+*.key
+*.pem
+*.crt
+*.cer
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.truststore
+
+# Go
+*.exe
+*.out
+/bin/
+/vendor/
+_test/
+*.test
+
+# C/C++
+*.o
+*.d
+*.obj
+*.exe
+*.out
+/bin/
+/lib/
+*.so
+*.dylib
+*.dll
+*.a
+*.lib
+*.cmake
+CMakeCache.txt
+CMakeFiles/
+build/
+/build/
+compile_commands.json
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+/bin/
+/target/
+/out/
+.classpath
+.project
+.settings/
+nbproject/
+/dist/
+/build/
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+*.iml
+.idea/
+
+# Flutter - Primary Focus
+# General Flutter project files
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+build/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+.pub-cache/
+.pub/
+*.g.dart # Generated Dart files
+
+# Android - Primary Target
+android/.gradle
+android/build
+android/app/build
+android/.idea
+android/.cxx
+android/local.properties
+**/android/**/gradle-wrapper.jar
+**/android/captures/
+**/android/gradlew
+**/android/gradlew.bat
+**/android/**/GeneratedPluginRegistrant.java
+android/key.properties
+android/keystore
+android/app/google-services.json
+
+# Android Studio build artifacts
+/android/app/debug
+/android/app/profile
+/android/app/release
+*.pepk
+*.aab
+
+# iOS/Xcode - Primary Target
+xcuserdata/
+*.xcworkspace
+DerivedData/
+*.moved-aside
+*.xcuserstate
+**/ios/**/*.mode1v3
+**/ios/**/*.mode2v3
+**/ios/**/*.moved-aside
+**/ios/**/*.pbxuser
+**/ios/**/*.perspectivev3
+**/ios/**/*sync/
+**/ios/**/.sconsign.dblite
+**/ios/**/.tags*
+**/ios/**/.vagrant/
+**/ios/**/DerivedData/
+**/ios/**/Icon?
+**/ios/**/Pods/
+**/ios/**/.symlinks/
+**/ios/**/profile
+**/ios/**/xcuserdata
+**/ios/.generated/
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/app.flx
+**/ios/Flutter/app.zip
+**/ios/Flutter/flutter_assets/
+**/ios/Flutter/.last_build_id
+**/ios/ServiceDefinitions.json
+**/ios/Runner/GeneratedPluginRegistrant.*
+flutter_export_environment.sh # Flutter iOS build environment script
+
+# Exceptions to iOS rules
+!**/ios/**/default.mode1v3
+!**/ios/**/default.mode2v3
+!**/ios/**/default.pbxuser
+!**/ios/**/default.perspectivev3
+!/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
+
+# VS Code (common development environment)
+.vscode/
+
+# IntelliJ related (common with Android development)
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Symbolication and Obfuscation
+app.*.symbols
+app.*.map.json
+
+# Others
+keys/*
