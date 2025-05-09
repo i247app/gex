@@ -58,17 +58,37 @@ func NewManager(tokenLocator TokenLocator) *Manager {
 	}
 }
 
-func (s *Manager) GetSessionFromRequest(r *http.Request) (*Session, error) {
-	return s.getSessionFromRequest(r)
+func (s *Manager) GetSession(sessionKey string) (*Session, error) {
+	bucket, ok := s.sessionCache[sessionKey]
+	if !ok {
+		return nil, fmt.Errorf("session not found")
+	}
+	return &Session{bucket: bucket}, nil
 }
 
-func (s *Manager) CreateSession(key string, data *map[string]any) {
+func (s *Manager) GetSessionFromRequest(r *http.Request) (*Session, error) {
+	// Get JWT
+	sessToken, err := s.tokenLocator.Locate(r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse auth header: %v", err)
+	}
+
+	// Check cache
+	sess, err := s.GetSession(sessToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get session: %v", err)
+	}
+
+	return sess, nil
+}
+
+func (s *Manager) CreateSession(sessionKey string, data *map[string]any) {
 	sess := sync.Map{}
 	for k, v := range *data {
 		sess.Store(k, v)
 	}
 
-	s.sessionCache[key] = &sess
+	s.sessionCache[sessionKey] = &sess
 }
 
 func (s *Manager) Dump() *map[string]map[string]any {
@@ -84,22 +104,4 @@ func (s *Manager) Dump() *map[string]map[string]any {
 	}
 
 	return &result
-}
-
-func (s *Manager) getSessionFromRequest(r *http.Request) (*Session, error) {
-	// Get JWT
-	sessToken, err := s.tokenLocator.Locate(r)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse auth header: %v", err)
-	}
-
-	// Check cache
-	bucket, ok := s.sessionCache[sessToken]
-	if !ok {
-		return nil, fmt.Errorf("session not found")
-	}
-	// fmt.Printf("sessToken %v\n", sessToken)
-	// fmt.Printf("sessToken bucket %v\n", bucket)
-
-	return &Session{bucket: bucket}, nil
 }
