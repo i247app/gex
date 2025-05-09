@@ -26,7 +26,7 @@ func (s *Session) Get(key string) (any, bool) {
 func (s *Session) UserID() (int64, bool) {
 	result, ok := s.Get("user_id")
 	if !ok {
-		fmt.Println("ERROR: key 'user_id' NOT IN SESSION STORE")
+		fmt.Println("ERROR: key 'user_id' not in session store")
 		return 0, false
 	}
 
@@ -58,12 +58,12 @@ func NewManager(tokenLocator TokenLocator) *Manager {
 	}
 }
 
-func (s *Manager) GetSession(sessionKey string) (*Session, error) {
+func (s *Manager) GetSession(sessionKey string) (*Session, bool) {
 	bucket, ok := s.sessionCache[sessionKey]
 	if !ok {
-		return nil, fmt.Errorf("session not found")
+		return nil, false
 	}
-	return &Session{bucket: bucket}, nil
+	return &Session{bucket: bucket}, true
 }
 
 func (s *Manager) GetSessionFromRequest(r *http.Request) (*Session, error) {
@@ -74,21 +74,24 @@ func (s *Manager) GetSessionFromRequest(r *http.Request) (*Session, error) {
 	}
 
 	// Check cache
-	sess, err := s.GetSession(sessToken)
-	if err != nil {
+	sess, ok := s.GetSession(sessToken)
+	if !ok {
 		return nil, fmt.Errorf("failed to get session: %v", err)
 	}
 
 	return sess, nil
 }
 
-func (s *Manager) CreateSession(sessionKey string, data *map[string]any) {
-	sess := sync.Map{}
+func (s *Manager) CreateSession(sessionKey string, data *map[string]any) *Session {
+	sess := Session{bucket: new(sync.Map)}
 	for k, v := range *data {
-		sess.Store(k, v)
+		sess.Put(k, v)
 	}
 
-	s.sessionCache[sessionKey] = &sess
+	// Store bucket in sessionCache (Where session data is actually kept)
+	s.sessionCache[sessionKey] = sess.bucket
+
+	return &sess
 }
 
 func (s *Manager) Dump() *map[string]map[string]any {
