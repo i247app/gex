@@ -1,1 +1,45 @@
 # Go Exchange Server
+#
+# your_project/
+├── cmd/
+│   └── your_app/
+│       └── main.go
+├── internal/
+│   ├── middleware/
+│   │   ├── auth_middleware.go       // Handles authentication
+│   │   ├── logging_middleware.go    // Handles request/response logging
+│   │   ├── validation_middleware.go // Handles input validation (if you centralize it)
+│   │   ├── cors_middleware.go       // Handles Cross-Origin Resource Sharing
+│   │   ├── rate_limit_middleware.go // Handles rate limiting (if implemented)
+│   │   └── transaction_middleware.go // Specific to financial transactions (e.g., logging)
+│   ├── handler/
+│   │   ├── auth_handler.go         // Sign up, login
+│   │   ├── user_handler.go         // Profile management
+│   │   ├── transaction_handler.go  // Transfer funds
+│   │   ├── membership_handler.go   // Membership related endpoints
+│   │   └── reward_handler.go       // Reward system endpoints
+│   ├── service/
+│   │   ├── auth_service.go
+│   │   ├── user_service.go
+│   │   ├── transaction_service.go
+│   │   ├── membership_service.go
+│   │   └── reward_service.go
+│   ├── repository/
+│   │   ├── user_repository.go
+│   │   ├── transaction_repository.go
+│   │   ├── membership_repository.go
+│   │   └── reward_repository.go
+│   ├── model/
+│   │   ├── user.go
+│   │   ├── transaction.go
+│   │   ├── membership.go
+│   │   └── reward.go
+│   └── utils/                  // For general utility functions
+│       └── ...
+└── pkg/
+    └── dto/
+        ├── auth_dto.go
+        ├── user_dto.go
+        ├── transaction_dto.go
+        ├── membership_dto.go
+        └── reward_dto.go
