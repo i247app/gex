@@ -57,10 +57,7 @@ func (a *App) RegisterMiddleware(middleware Middleware) {
 }
 
 func (a *App) SetupServerCORS() {
-	a.server.Handler = cors.New(cors.Options{
-		AllowedOrigins: []string{"*"},
-		ExposedHeaders: []string{"*"},
-	}).Handler(a.server.Handler)
+	a.server.Handler = cors.AllowAll().Handler(a.server.Handler)
 }
 
 /**
