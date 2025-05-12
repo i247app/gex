@@ -99,7 +99,7 @@ func (a *App) Start() error {
 	}
 
 	// Shutdown gracefully
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
 	if err := a.server.Shutdown(shutdownCtx); err != nil {
