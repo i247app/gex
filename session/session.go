@@ -83,7 +83,14 @@ func (s *Manager) GetSessionFromRequest(r *http.Request) (*Session, error) {
 }
 
 func (s *Manager) CreateSession(sessionKey string) *Session {
+	return s.CreateSessionFromMap(sessionKey, &map[string]any{})
+}
+
+func (s *Manager) CreateSessionFromMap(sessionKey string, data *map[string]any) *Session {
 	sess := Session{bucket: new(sync.Map)}
+	for k, v := range *data {
+		sess.Put(k, v)
+	}
 
 	// Store bucket in sessionCache (Where session data is actually kept)
 	s.sessionCache[sessionKey] = sess.bucket
