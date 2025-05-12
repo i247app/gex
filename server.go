@@ -21,8 +21,9 @@ type HostConfig struct {
 type App struct {
 	HostConfig HostConfig
 
-	mux    *gexMux
-	server *http.Server
+	mux        *gexMux
+	server     *http.Server
+	onShutdown []func()
 }
 
 type Middleware func(http.Handler) http.Handler
@@ -60,6 +61,10 @@ func (a *App) SetupServerCORS() {
 	a.server.Handler = cors.AllowAll().Handler(a.server.Handler)
 }
 
+func (a *App) OnShutdown(cleanupFunc func()) {
+	a.onShutdown = append(a.onShutdown, cleanupFunc)
+}
+
 /**
  * Runs the server while listening for shutdown signals
  */
@@ -87,6 +92,11 @@ func (a *App) Start() error {
 
 	// Wait for shutdown signal
 	<-ctx.Done()
+
+	// Call all shutdown hooks
+	for _, hook := range a.onShutdown {
+		hook()
+	}
 
 	// Shutdown gracefully
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
