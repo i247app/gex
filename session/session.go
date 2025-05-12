@@ -32,7 +32,7 @@ func (s *Session) UserID() (int64, bool) {
 
 	userID, ok := result.(int64)
 	if !ok {
-		fmt.Println("ERROR: 'user_id' is in session store but cant be converted to int64")
+		fmt.Printf("ERROR: 'user_id' is in session store but expected to be an int64, is a %T\n", result)
 		return 0, false
 	}
 
@@ -82,16 +82,17 @@ func (s *Manager) GetSessionFromRequest(r *http.Request) (*Session, error) {
 	return sess, nil
 }
 
-func (s *Manager) CreateSession(sessionKey string, data *map[string]any) *Session {
+func (s *Manager) CreateSession(sessionKey string) *Session {
 	sess := Session{bucket: new(sync.Map)}
-	for k, v := range *data {
-		sess.Put(k, v)
-	}
 
 	// Store bucket in sessionCache (Where session data is actually kept)
 	s.sessionCache[sessionKey] = sess.bucket
 
 	return &sess
+}
+
+func (s *Manager) DeleteSession(sessionKey string) {
+	delete(s.sessionCache, sessionKey)
 }
 
 func (s *Manager) Dump() *map[string]map[string]any {
