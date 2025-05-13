@@ -58,7 +58,20 @@ func (a *App) RegisterMiddleware(middleware Middleware) {
 }
 
 func (a *App) SetupServerCORS() {
-	a.server.Handler = cors.AllowAll().Handler(a.server.Handler)
+	a.server.Handler = cors.New(cors.Options{
+		AllowedOrigins: []string{"*"},
+		AllowedMethods: []string{
+			http.MethodHead,
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodPut,
+			http.MethodPatch,
+			http.MethodDelete,
+		},
+		AllowedHeaders:   []string{"*"},
+		ExposedHeaders:   []string{"*"},
+		AllowCredentials: false,
+	}).Handler(a.server.Handler)
 }
 
 func (a *App) OnShutdown(cleanupFunc func()) {
