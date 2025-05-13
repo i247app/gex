@@ -68,8 +68,8 @@ func (a *App) SetupServerCORS() {
 			http.MethodPatch,
 			http.MethodDelete,
 		},
-		AllowedHeaders:   []string{"*"},
 		ExposedHeaders:   []string{"*"},
+		AllowedHeaders:   []string{"*"},
 		AllowCredentials: false,
 	}).Handler(a.server.Handler)
 }
