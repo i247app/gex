@@ -1,0 +1,132 @@
+#
+#add system user and group
+#
+sudo groupadd -g 327 mysql
+sudo useradd -u 327 -g 327 -c MySQL -d /dev/null -s /bin/false mysql
+
+#this works on aws ubuntu 16.04
+#
+#unistall if necessary
+#
+#sudo apt-get purge mysql*
+#sudo apt-get autoremove
+#sudo apt-get autoclean
+#sudo rm -rf /etc/mysql /var/lib/mysql
+
+sudo apt-get update
+sudo apt-get upgrade
+sudo apt-get install mysql-server mysql-client
+
+it will ask for the mysql root user password
+
+mysql -u root -pZse45tgb
+
+create database dvldb CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+use dvldb
+create user juno@localhost identified by 'Zse45tgb';
+
+grant usage on * to juno@localhost identified by 'Zse45tgb';
+grant usage on * to juno@'%.kashin.io' identified by 'Zse45tgb';
+flush privileges;
+
+grant all on dvldb.* to juno@localhost;
+grant all on dvldb.* to juno@'%.kashin.io';
+flush privileges;
+
+grant file on *.* to juno@localhost;
+flush privileges;
+
+alter user root@localhost password expire never;
+alter user juno@localhost password expire never;
+alter user juno@'%.kashin.io' password expire never;
+flush privileges;
+
+
+jdbc warning
+Thu Nov 24 07:26:39 UTC 2016 WARN: Establishing SSL connection without server's identity verification is not recommended. According to MySQL 5.5.45+, 5.6.26+ and 5.7.6+ requirements SSL connection must be established by default if explicit option isn't set. For compliance with existing applications not using SSL the verifyServerCertificate property is set to 'false'. You need either to explicitly disable SSL by setting useSSL=false, or set useSSL=true and provide truststore for server certificate verification.
+
+
+//REQUIRED for mysqld and mysql client
+
+#
+#WARNING all hosts or clients need the same certs
+#        so just copy and share among hosts
+#
+
+#using mysql_ssl_rsa_setup
+#creates pem files in the data dir
+#note - sharing the same ca.pem file
+
+sudo mkdir -p /etc/mysql/ssl
+sudo mysql_ssl_rsa_setup --datadir=/etc/mysql/ssl
+
+##   copy these 3 files from k4 or the most current stable machine
+##   or perform the edits below on these 3 file that were installed
+##   by the mysql installation
+#/etc/mysql/mysql.conf.d/mysqld.cnf
+#/etc/mysql/conf.d/mysqldump.cnf
+#/etc/mysql/conf.d/mysqld.cnf
+
+edit cnf
+
+#/etc/mysql/mysql.conf.d/mysqld.cnf  # egrep -v '^$|^#' /etc/mysql/mysql.conf.d/mysqld.cnf
+[mysqld]
+user		= mysql
+pid-file	= /var/run/mysqld/mysqld.pid
+socket	        = /var/run/mysqld/mysqld.sock
+mysqlx_socket	= /var/run/mysqld/mysqlx.sock
+port		= 45504
+mysqlx_port	= 55060
+datadir=/data/mysql
+interactive_timeout = 31536000
+wait_timeout = 31536000
+character-set-client-handshake = FALSE
+character-set-server = utf8mb4
+collation-server = utf8mb4_general_ci
+ft_min_word_len=1
+tls_version=TLSv1,TLSv1.1,TLSv1.2,TLSv1.3
+bind-address		= 0.0.0.0
+mysqlx-bind-address	= 0.0.0.0
+ssl-ca   = /etc/mysql/ssl/ca.pem
+ssl-cert = /etc/mysql/ssl/server-cert.pem
+ssl-key  = /etc/mysql/ssl/server-key.pem
+key_buffer_size		= 128M
+max_allowed_packet	= 512M
+myisam-recover-options  = BACKUP
+log_error = /var/log/mysql/error.log
+max_binlog_size   = 100M
+
+#note - if use skip_ssl, must comment our ssl-xxx
+
+# skip_ssl
+
+#make sure client fields are readable
+#/etc/mysql/conf.d/mysql.cnf
+[mysql]
+port=45504
+default-character-set = utf8mb4
+#
+ssl-ca   =/etc/mysql/ssl/ca.pem
+ssl-cert =/etc/mysql/ssl/client-cert.pem
+ssl-key  =/etc/mysql/ssl/client-key.pem
+
+tls_version=TLSv1,TLSv1.1,TLSv1.2,TLSv1.3
+
+#/etc/mysql/conf.d/mysqldump.cnf
+[mysqldump]
+port     = 45504
+ssl-ca   = /etc/mysql/ssl/ca.pem
+ssl-cert = /etc/mysql/ssl/client-cert.pem
+ssl-key  = /etc/mysql/ssl/client-key.pem
+quick
+quote-names
+max_allowed_packet = 16M
+tls_version=TLSv1,TLSv1.1,TLSv1.2,TLSv1.3
+
+##
+
+/etc/init.d/mysql start
+/etc/init.d/mysql stop
+#
+# import dump db
+#

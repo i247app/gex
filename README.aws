@@ -1,0 +1,473 @@
+#####
+########## AWS EC2 build ##########
+#####
+# dvl env
+# Oregon us-west-2 Zone us-west-2b
+# AWS ec2 ububtu 24.04 LTS
+# t4g.small 2mb ram min for MySQL
+# vpc-046c0d98e8740eb8f
+# Use subnet to force zone us-west-2b 172.31.16.0/20 172.31.16.1 - 172.31.31.254
+# zone us-west-2b 172.31.16.0/20
+
+#
+# 1 - create 4 network interface with assigned ip address
+#
+i#us-west-2b
+neti-us-west-2b-100 172.31.31.100 t0.vpc
+neti-us-west-2b-101 172.31.31.101 t1.vpc
+neti-us-west-2b-102 172.31.31.102 t2.vpc
+neti-us-west-2b-103 172.31.31.103 t3.vpc
+
+
+#####
+########## AWS EC2 Installation ##########
+#####
+
+# AWS ec2 ububtu 16.04 LTS
+# see README.awsUbuntu16.04base
+#
+# Note - use XMODBY jondoe
+
+# login to ec2
+ssh -i myKey.pem ubuntu@ec2.public.ip
+
+# Howto generate public ssh key for .ssh/authorized_keys
+# 
+ssh-keygen -f myKey.pem -y
+
+#####
+########## 1 - OS Update and Critical ##########
+#####
+
+#
+# update/upgrade ubuntu
+#
+
+apt update
+apt upgrade
+
+#
+# ububtu - disable auto updates
+#
+vi /etc/apt/apt.conf.d/20auto-upgrades
+
+# turn off auto updates by setting values to 0
+APT::Periodic::Update-Package-Lists "0";
+APT::Periodic::Unattended-Upgrade "0";
+APT::Periodic::Download-Upgradeable-Packages "0";
+APT::Periodic::AutocleanInterval "0";
+
+#
+# reboot server
+#
+
+#####
+########## 2 - Server Setup ##########
+#####
+
+# using same pub/priv key
+# copy the myKey.pem ubuntu and juno
+~/.ssh/myKey.pem
+
+# change hostname
+vi /etc/hostname
+
+change to t2
+
+# add t4
+vi /etc/hosts
+127.0.0.1 localhostt t2
+
+# XMODBY rkl
+# VPC - # vpc-046c0d98e8740eb8f
+# IPv4 CIDR
+# us-west-2  172.31.0.0/16 172.31.255.255
+# us-west-2a 172.31.32.0/20 172.31.32.1 - 172.31.47.254
+# us-west-2b 172.31.16.0/20 172.31.16.1 - 172.31.31.254
+# us-west-2c 172.31.0.0/20  172.31.0.1  - 172.31.15.254
+# us-west-2d 172.31.48.0/20 172.31.48.1 - 172.31.63.254 
+
+# private us-west-2b
+172.31.31.100 t0.vpc
+172.31.31.101 t1.vpc
+172.31.31.102 t2.vpc
+172.31.31.103 t3.vpc
+172.31.31.104 t4.vpc
+
+# public ip
+52.33.7.77 t0.tnmonex.com t0
+52.11.162.21 t1.tnmonex.com t1
+52.39.197.215 t2.tnmonex.com t2
+52.41.199.106 t3.tnmonex.com t3
+52.38.201.219 t4.tnmonex.com t4
+
+
+# edit ssh motd and comment out lines
+vi /etc/pam.d/sshd
+
+# comment out this line
+# session    optional     pam_motd.so motd=/run/motd.dynamic
+
+#
+# reboot server
+#
+
+#####
+########## 3 - User and Application Setup ##########
+#####
+######### 2 - user setup
+groupadd -g 327 mysql
+useradd -u 327 -g 327 -c MySQL -d /blackhole -s /bin/false mysql
+
+groupadd -g 1500 monex
+useradd -u 1500 -g 1500 -c VCBM -m -d /home/monex -k /etc/skel -s /bin/bash monex
+
+useradd -u 1520 -g 1500 -c VCBM -m -d /home/staff -k /etc/skel -s /bin/bash staff
+
+useradd -u 1525 -g 1500 -c VCBM -m -d /home/tuan -k /etc/skel -s /bin/bash tuan
+
+useradd -u 1555 -g 1500 -c ext-dvl -m -d /home/rkl -k /etc/skel -s /bin/bash rkl
+useradd -u 1556 -g 1500 -c ext-dvl -m -d /home/alex -k /etc/skel -s /bin/bash alex
+useradd -u 1557 -g 1500 -c ext-dvl -m -d /home/huy -k /etc/skel -s /bin/bash huy
+
+useradd -u 1611 -g 1500 -c guest1 -m -d /home/guest1 -k /etc/skel -s /bin/bash guest1
+
+# dont set user password
+
+#
+# do the pushkeys 
+#
+
+#add juno to sudoers 90-cloud-init-users or create own file
+sudo vi /etc/sudoers.d/90-cloud-init-users
+
+# XMODBY
+monex ALL=(ALL) NOPASSWD:ALL
+rkl ALL=(ALL) NOPASSWD:ALL
+alex ALL=(ALL) NOPASSWD:ALL
+
+#
+# ntp install enable
+# should be isntalled already
+# apt install chrony
+# systemctl status chronyd
+# systemctl start chronyd
+# systemctl enable chronyd # startup on system boot or reboot
+
+# edit /etc/chrony/chrony.conf
+server 169.254.169.123 prefer iburst minpoll 4 maxpoll 5
+pool pool.ntp.org          iburst maxsources 4
+pool us.pool.ntp.org       iburst maxsources 4
+pool asia.pool.ntp.org     iburst maxsources 4
+
+#
+# make
+#
+apt install -y make
+
+#
+# Go Language
+#
+apt install -y golang-go
+
+#
+# webserver
+#
+# apache
+#
+# sudo apt install apache2
+# #enable https tls/ssl
+# sudo a2enmod ssl
+# sudo a2ensite default-ssl
+# sudo systemctl restart apache2
+ 
+#
+# nginx
+#
+# check if enable for auto-start on system reboot
+# systemctl is-enabled nginx
+apt install -y nginx
+systemctl status nginx
+systemctl start nginx
+systemctl stop nginx
+
+#
+# /etc/nginx/sites-available/ezmonex.com
+#
+######## ezmonex.com content #########
+# ezmonex server configuration
+server {
+	listen 80 default_server;
+	listen [::]:80 default_server;
+
+	server_name _;
+
+	root /var/www/html;
+	index index.html index.htm index.nginx-debian.html;
+
+	location / {
+		try_files $uri $uri/ =404;
+	}
+}
+
+# Virtual host - t2.ezmonex.com
+server {
+	listen 80;
+	listen [::]:80;
+
+	listen [::]:443 ssl ipv6only=on; # managed by Certbot
+	listen 443 ssl; # managed by Certbot
+
+	# ssl_certificate /etc/letsencrypt/live/t1.ezmonex.com/fullchain.pem; # managed by Certbot
+	# ssl_certificate_key /etc/letsencrypt/live/t1.ezmonex.com/privkey.pem; # managed by Certbot
+	# include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+	# ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+
+	server_name t1.ezmonex.com;
+
+  # proxy to go server
+	location /go/ {
+		proxy_pass https://t1.vpc:9543/; 
+		proxy_redirect off;
+
+		proxy_set_header Host $host;
+		proxy_set_header X-Real-IP $remote_addr;
+		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+		client_max_body_size 10m;
+		client_body_buffer_size 128k;
+
+		proxy_connect_timeout 90;
+		proxy_send_timeout 90;
+		proxy_read_timeout 90;
+
+		proxy_buffer_size 4k;
+		proxy_buffers 4 32k;
+		proxy_busy_buffers_size 64k;
+		proxy_temp_file_write_size 64k;
+	}
+}
+######## ezmonex.com content #########
+
+# configure for certificates
+
+# AAA - real cert with Lets Encrypt SSL/TLS Certificate
+apt update
+apt install certbot python3-certbot-nginx
+
+# --no-redirect tells certbot not to insert redirect http to https in config file
+# certbot --nginx --no-redirect -d t0.tnmonex.com
+#
+# certonly
+# certbot certonly --nginx --no-redirect -d t0.tnmonex.com
+
+# a. create 2 certs - yourdomain.com and t0.yourdomain.com
+# sudo certbot --nginx -d yourdomain.com -d t0.yourdomain.com
+#
+# b. create cert only fro this  subdomain
+certbot --nginx -d t0.tnmonex.com
+
+# or 
+
+# BBB - self-sign certs
+# /etc/ssl/certs/nginx-selfsigned.crt
+# /etc/ssl/private/nginx-selfsigned.key
+openssl req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout nginx-selfsigned.key -out nginx-selfsigned.crt
+
+# move files to the ssl dirs
+/etc/ssl/private/nginx-selfsigned.key
+/etc/ssl/certs/nginx-selfsigned.crt
+
+# config default or custom config file nginx ssl config section
+/etc/nginx/sites-available/default
+
+listen 443 ssl default_server;
+listen [::]:443 ssl default_server;
+ssl_certificate /etc/ssl/certs/nginx.crt; # Path to your certificate file
+ssl_certificate_key /etc/ssl/private/nginx.key; # Path to your private key file
+ssl_protocols TLSv1.2 TLSv1.3; # Recommended protocols
+ssl_prefer_server_ciphers off;
+
+# ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384'; # Recommended ciphers
+
+#
+# mysql
+#
+#WARNING - be sure apparmor is not running
+apt install mysql-server mysql-client   # for version 8
+
+#
+# KNOWN CONNECT ISSUES - fix bind-address
+# /etc/mysql/mysql.conf.d/mysqld.conf
+#
+bind-address            = 0.0.0.0
+mysqlx-bind-address     = 0.0.0.0
+
+#
+# ssl
+#
+#WARNING ssl files are in mysql datadir
+#
+# custom ssl - ssl expires in 10 years - 20161124
+# sudo mkdir -p /etc/mysql/ssl
+# sudo mysql_ssl_rsa_setup --datadir=/etc/mysql/ssl  # do [NOT] run this
+# sudo copy k3:/etc/mysql/ssl/* files to /etc/mysql/ssl
+# sudo chown mysql.mysql *.pem
+# sudo chmod 644 client*.pem server*.pem ca.pem
+# sudo chmod 600 private_key.pem ca-key.pem
+
+-rw------- 1 mysql mysql 1675 Nov 26 02:59 ca-key.pem
+-rw-r--r-- 1 mysql mysql 1074 Nov 26 02:59 ca.pem
+-rw-r--r-- 1 mysql mysql 1078 Nov 26 02:59 client-cert.pem
+-rw-r--r-- 1 mysql mysql 1675 Nov 26 02:59 client-key.pem
+-rw------- 1 mysql mysql 1679 Nov 26 02:59 private_key.pem
+-rw-r--r-- 1 mysql mysql  451 Nov 26 02:59 public_key.pem
+-rw-r--r-- 1 mysql mysql 1078 Nov 26 02:59 server-cert.pem
+-rw-r--r-- 1 mysql mysql 1679 Nov 26 02:59 server-key.pem
+
+##   copy these 3 files from t2 or the most current stable machine
+##   or perform the edits below on these 3 file that were installed
+##   by the mysql installation
+# /etc/mysql/conf.d/mysql.cnf
+# /etc/mysql/conf.d/mysqldump.cnf
+# /etc/mysql/mysql.conf.d/mysqld.cnf
+
+# if using custom datadir to /data/mysql
+# AppArmor
+#
+# after MySQL install, add AppArmor lines to allow access 
+
+/etc/apparmor.d/usr.sbin.mysqld
+
+# Allow data dir access
+  /var/lib/mysql/ r,
+  /var/lib/mysql/** rwk,
+
+  /data/mysql/ r,
+  /data/mysql/** rwk,
+
+# AppArmor
+####################
+
+#
+#  phpmyadmin (ubuntu 20.04)
+#
+sudo apt-get -y upgrade
+sudo apt-get -y install phpmyadmin
+ - pick apache in the ui
+ - pick 'No' when asked to configure the db
+
+#sudo mysql -hlocalhost -uroot -p
+# show grants for phpmyadmin@localhost;
+#file /etc/apache2/conf-enabled/phpmyadmin.conf
+
+#
+sudo ln -s /etc/phpmyadmin/apache.conf /etc/apache2/conf-available/phpmyadmin.conf
+ls -al /etc/phpmyadmin/apache.conf
+ls -al /etc/apache2/conf-available/phpmyadmin.conf
+sudo a2enconf phpmyadmin
+
+sudo systemctl reload apache2
+sudo systemctl status apache2
+
+#
+########## customization installation here ###########
+#
+
+#
+#mysql
+#
+#moving datadir from /var/lib/mysql to /data/mysql
+#note - sometimes requires /var/lib/mysql to exist
+
+#first, stop mysqld
+sudo systemctl stop mysql
+
+#copy db datadir
+sudo cd /data
+sudo rsync -av /var/lib/mysql .
+
+#edit
+sudo vi /etc/mysql/mysql.conf.d/mysqld.cnf
+datadir=/data/mysql
+
+# reboot
+shutdown -r now
+systemctl status mysql    # verify mysql is up
+mysql -hlocalhost -uroot -p -e "show variables;" | grep datad  # verify datadir
+
+#
+# apache2
+#
+#change Directory from /var/www to /data/www
+/etc/apache2/apache2.conf
+
+#change DocumentRoot from /var/www/html to /data/www/html
+/etc/apache2/sites-enabled/000-default.conf
+/etc/apache2/sites-enabled/default-ssl.conf
+
+#
+#data dir
+#
+sudo mkdir -p           /data/www/html
+sudo chown -R juno:juno /data/www
+sudo chmod -R 775       /data/www
+ls -ald /data/*
+
+#
+# kex
+#
+sudo mkdir -p /apps/one/prd
+sudo chmod -R 775 /apps/one
+sudo chown -R juno.juno /apps/one
+sudo ln -s /apps/one/prd/java /usr/local/java
+
+cd /apps/one/prd   #install jdk  here
+                   # jdk tar should be in ~ubuntu/downloads
+
+## rsync install of /apps/one/prd
+rsync -av -e "ssh -i /home/juno/.ssh/myKey.pem" k[345x]:/apps/one/prd /apps/one
+ ## k[345x] is the machine with latest code and config files. ex: t2
+
+sudo cp /apps/one/prd/zcustom.sh /etc/profile.d/
+
+# if did  the rsync install of /apps/one/prd, skip to 'apache certificate'
+
+### manual install
+
+ln -s /apps/one/prd/jdk.x.x java
+
+######### apps setup
+
+sudo mkdir -p /apps/one/prd/bin
+sudo mkdir -p /apps/one/prd/data
+sudo mkdir -p /apps/one/prd/lib
+sudo mkdir -p /apps/one/prd/log
+
+sudo chown -R juno.juno /apps/one
+sudo chmod -R 775 /apps/one
+
+#copy /apps/one/prd/lib
+rsync -av -e "ssh -i /home/juno/.ssh/myKey.pem" p3:/apps/one/prd/lib /apps/one/prd/
+
+cd /apps/one/prd
+
+#copy jdk and extract
+rsync -av -e "ssh -i /home/juno/.ssh/myKey.pem" p3:/apps/one/prd/jdk-8u111-linux-x64.tar.gz /apps/one/prd/
+
+tar xfz jdx-8u111-linux-x64.tar.gz
+
+ln -s /apps/one/prd/jdk1.8.0_111 java
+
+sudo ln -s /apps/one/prd/java /usr/local/
+
+
+#copy env files
+rsync -av -e "ssh -i /home/juno/.ssh/myKey.pem" p3:/apps/one/prd/classpath.env /apps/one/prd/
+
+rsync -av -e "ssh -i /home/juno/.ssh/myKey.pem" p3:/apps/one/prd/zcustom.sh /apps/one/prd/
+
+sudo cp zcustom.sh /etc/profile.d/
+
+# apache certificate
+look at README.certbot
