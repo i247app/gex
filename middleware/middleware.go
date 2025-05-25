@@ -12,11 +12,20 @@ import (
 	"github.com/i247app/gex/util"
 )
 
+type RequestToSession func(r *http.Request, sessionService *session.Manager, jwtToolkit *jwtutil.Toolkit) (session.ISession, error)
+
+type SessionFactory func() session.ISession
+
 // JwtMiddleware is a middleware that handles JWT authentication and session management.
 // It checks for an existing JWT token in the Authorization header, generates a new one if none is found,
 // and creates a new session if one doesn't exist.
 // It also wraps the response writer to capture the response body.
-func JwtMiddleware(sessionService *session.Manager, jwtToolkit *jwtutil.Toolkit) func(http.Handler) http.Handler {
+func JwtMiddleware(
+	sessionService *session.Manager,
+	jwtToolkit *jwtutil.Toolkit,
+	requestToSession RequestToSession,
+	sessionFactory SessionFactory,
+) func(http.Handler) http.Handler {
 	var log = fmt.Println
 
 	return func(next http.Handler) http.Handler {
@@ -35,11 +44,11 @@ func JwtMiddleware(sessionService *session.Manager, jwtToolkit *jwtutil.Toolkit)
 
 			// Check for existing JWT token
 			if authHeader := r.Header.Get("Authorization"); authHeader != "" {
-				// log(">> DefaultSessionMiddleware: found JWT token in Authorization header")
+				// log(">> JwtMiddleware: found JWT token in Authorization header")
 
 				z, err := jwtToolkit.GetAuthorizationHeaderJwt(authHeader)
 				if err != nil {
-					log(">> DefaultSessionMiddleware: error converting Authorization header to JWT:", err)
+					log(">> JwtMiddleware: error converting Authorization header to JWT:", err)
 				}
 
 				jwtToken = z
@@ -49,13 +58,13 @@ func JwtMiddleware(sessionService *session.Manager, jwtToolkit *jwtutil.Toolkit)
 
 			// If no JWT token found, create a new anonymous session
 			if jwtToken == nil {
-				// log(">> DefaultSessionMiddleware: no JWT token found")
+				// log(">> JwtMiddleware: no JWT token found")
 
 				claims = jwtutil.NewClaims(util.GenerateSessionKey())
 
 				zjwtToken, err := jwtToolkit.GenerateJwt(claims)
 				if err != nil {
-					log(">> DefaultSessionMiddleware: error generating JWT:", err)
+					log(">> JwtMiddleware: error generating JWT:", err)
 				}
 				jwtToken = zjwtToken
 			}
@@ -65,20 +74,21 @@ func JwtMiddleware(sessionService *session.Manager, jwtToolkit *jwtutil.Toolkit)
 				var z string
 				z, err := jwtToolkit.SignToken(jwtToken)
 				if err != nil {
-					log(">> DefaultSessionMiddleware: error signing JWT:", err)
+					log(">> JwtMiddleware: error signing JWT:", err)
 				}
 				authToken = z
 			}
 
 			// Check if the session exists
-			_, err := sessionService.GetSessionFromRequest(r)
-			if err != nil {
-				log(">> DefaultSessionMiddleware: no session found (most likely no client JWT detected)")
+			sess, err := requestToSession(r, sessionService, jwtToolkit)
+			if sess == nil || err != nil {
+				log(">> JwtMiddleware: no session found (most likely no client JWT detected)")
 
-				sess := sessionService.CreateSession(claims.SessionKey)
-				sess.Put("source", "default_session_middleware")
+				sess, _ := sessionService.InitSession(claims.SessionKey, sessionFactory())
+				sess.Put("source", "gex.jwt_middleware")
 				sess.Put("token", authToken)
 				sess.Put("is_secure", false)
+
 			}
 
 			rwrap := &responseWriterWrapper{
