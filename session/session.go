@@ -1,21 +1,22 @@
 package session
 
-type ISession interface {
+// SessionStorer is an interface that defines the methods for a session store.
+type SessionStorer interface {
 	Put(key string, value any)
 	Get(key string) (any, bool)
 }
 
-type Manager struct {
-	sessions map[string]ISession
+// Container is a container for sessions.
+type Container struct {
+	sessions map[string]SessionStorer
 }
 
-func NewManager() *Manager {
-	return &Manager{
-		sessions: make(map[string]ISession),
-	}
+func NewContainer() *Container {
+	return &Container{sessions: make(map[string]SessionStorer)}
 }
 
-func (s *Manager) Session(sessionKey string) (ISession, bool) {
+// Session is used to get a session from the container.
+func (s *Container) Session(sessionKey string) (SessionStorer, bool) {
 	session, ok := s.sessions[sessionKey]
 	if !ok {
 		return nil, false
@@ -23,13 +24,14 @@ func (s *Manager) Session(sessionKey string) (ISession, bool) {
 	return session, true
 }
 
-func (s *Manager) Sessions() *map[string]ISession {
+// Sessions is used to get all sessions from the container.
+func (s *Container) Sessions() *map[string]SessionStorer {
 	return &s.sessions
 }
 
 // InitSession is used to initialize a session with a given key.
 // It accepts a session object to initialize the session with.
-func (s *Manager) InitSession(sessionKey string, sess ISession) (ISession, bool) {
+func (s *Container) InitSession(sessionKey string, sess SessionStorer) (SessionStorer, bool) {
 	if _, ok := s.sessions[sessionKey]; ok {
 		return nil, false
 	}
@@ -38,6 +40,6 @@ func (s *Manager) InitSession(sessionKey string, sess ISession) (ISession, bool)
 	return sess, true
 }
 
-func (s *Manager) DeleteSession(sessionKey string) {
+func (s *Container) DeleteSession(sessionKey string) {
 	delete(s.sessions, sessionKey)
 }

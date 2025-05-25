@@ -1,7 +1,10 @@
 package session
 
+import "sync"
+
 type InMemorySession struct {
-	Data map[string]any
+	Data      map[string]any
+	dataMutex sync.Mutex
 }
 
 func NewInMemorySession() *InMemorySession {
@@ -9,6 +12,9 @@ func NewInMemorySession() *InMemorySession {
 }
 
 func (s *InMemorySession) Put(key string, value any) {
+	s.dataMutex.Lock()
+	defer s.dataMutex.Unlock()
+
 	s.Data[key] = value
 }
 

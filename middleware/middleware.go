@@ -12,16 +12,16 @@ import (
 	"github.com/i247app/gex/util"
 )
 
-type RequestToSession func(r *http.Request, sessionService *session.Manager, jwtToolkit *jwtutil.Toolkit) (session.ISession, error)
+type RequestToSession func(r *http.Request, sessionService *session.Container, jwtToolkit *jwtutil.Toolkit) (session.SessionStorer, error)
 
-type SessionFactory func() session.ISession
+type SessionFactory func() session.SessionStorer
 
 // JwtMiddleware is a middleware that handles JWT authentication and session management.
 // It checks for an existing JWT token in the Authorization header, generates a new one if none is found,
 // and creates a new session if one doesn't exist.
 // It also wraps the response writer to capture the response body.
 func JwtMiddleware(
-	sessionService *session.Manager,
+	sessionContainer *session.Container,
 	jwtToolkit *jwtutil.Toolkit,
 	requestToSession RequestToSession,
 	sessionFactory SessionFactory,
@@ -80,11 +80,11 @@ func JwtMiddleware(
 			}
 
 			// Check if the session exists
-			sess, err := requestToSession(r, sessionService, jwtToolkit)
+			sess, err := requestToSession(r, sessionContainer, jwtToolkit)
 			if sess == nil || err != nil {
 				log(">> JwtMiddleware: no session found (most likely no client JWT detected)")
 
-				sess, _ := sessionService.InitSession(claims.SessionKey, sessionFactory())
+				sess, _ := sessionContainer.InitSession(claims.SessionKey, sessionFactory())
 				sess.Put("source", "gex.jwt_middleware")
 				sess.Put("token", authToken)
 				sess.Put("is_secure", false)
