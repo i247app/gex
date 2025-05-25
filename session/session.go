@@ -39,19 +39,18 @@ func (s *Session) UserID() (int64, bool) {
 	return userID, true
 }
 
-/**
- * Interface for locating the session token in the request
- */
-type TokenLocator interface {
+// AuthTokenLocator is an interface for locating the session token in the request
+// This allows for different implementations, such as JWT, API Key, etc.
+type AuthTokenLocator interface {
 	Locate(r *http.Request) (string, error)
 }
 
 type Manager struct {
-	tokenLocator TokenLocator
+	tokenLocator AuthTokenLocator
 	sessionCache map[string]*sync.Map
 }
 
-func NewManager(tokenLocator TokenLocator) *Manager {
+func NewManager(tokenLocator AuthTokenLocator) *Manager {
 	return &Manager{
 		tokenLocator: tokenLocator,
 		sessionCache: make(map[string]*sync.Map),
