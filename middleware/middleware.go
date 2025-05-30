@@ -49,11 +49,11 @@ func JwtMiddleware(
 				z, err := jwtToolkit.GetAuthorizationHeaderJwt(authHeader)
 				if err != nil {
 					log(">> JwtMiddleware: error converting Authorization header to JWT:", err)
+				} else {
+					jwtToken = z
+					claims = jwtToken.Claims.(*jwtutil.CustomClaims)
+					authToken = strings.TrimPrefix(authHeader, "Bearer ")
 				}
-
-				jwtToken = z
-				claims = jwtToken.Claims.(*jwtutil.CustomClaims)
-				authToken = strings.TrimPrefix(authHeader, "Bearer ")
 			}
 
 			// If no JWT token found, create a new anonymous session
