@@ -209,7 +209,8 @@ func JwtMiddleware(
 
 func writeError(w http.ResponseWriter, err error) {
 	resp := map[string]string{
-		"error": err.Error(),
+		"error":  "gex panic: " + err.Error(),
+		"origin": "jwt_middleware",
 	}
 	json.NewEncoder(w).Encode(resp)
 
