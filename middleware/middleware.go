@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
-	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt"
 	"github.com/i247app/gex/jwtutil"
@@ -12,7 +12,11 @@ import (
 	"github.com/i247app/gex/util"
 )
 
-type RequestToSession func(r *http.Request, sessionService *session.Container, jwtToolkit *jwtutil.Toolkit) (session.SessionStorer, error)
+var log = fmt.Println
+
+const (
+	DefaultSessionTTL = time.Second * 10
+)
 
 type SessionFactory func() session.SessionStorer
 
@@ -23,17 +27,16 @@ type SessionFactory func() session.SessionStorer
 func JwtMiddleware(
 	sessionContainer *session.Container,
 	jwtToolkit *jwtutil.Toolkit,
-	requestToSession RequestToSession,
 	sessionFactory SessionFactory,
+	sessionTTL time.Duration,
 ) func(http.Handler) http.Handler {
-	var log = fmt.Println
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var (
-				claims    *jwtutil.CustomClaims
-				jwtToken  *jwt.Token
-				authToken string
+				sessionKey     string
+				newAuthToken   *string
+				didAutoRefresh bool
 			)
 
 			// Skip entire token and session handling if this header is set
@@ -42,53 +45,124 @@ func JwtMiddleware(
 				return
 			}
 
-			// Check for existing JWT token
-			if authHeader := r.Header.Get("Authorization"); authHeader != "" {
-				// log(">> JwtMiddleware: found JWT token in Authorization header")
+			// JWT Middleware Flow:
+			//
+			// 1. Check for valid JWT token based on the Authorization header, set result to doesRequestHaveJwt
+			// 2a. If JWT token found, just get the session key
+			// 2b. If JWT token NOT found, create a new JWT token with session key
+			// 3. Check for a session linked to the JWT token's sessionKey
+			// 3a. If session is found, do nothing
+			// 3b. 🚨 If session is not found AND doesRequestHaveJwt == true, return unauthorized error
+			// 3c. If session is not found AND doesRequestHaveJwt == false, create a new session
+			// 4. Check session expiration
+			// 4a. 🚨 If session is expired, return unauthorized error
+			// 4b. If session is not expired, do nothing
+			// 5. Update session touched_at
+			// 6. Determine current authToken
+			// 7. Set the session token in the Authorization header
 
-				z, err := jwtToolkit.GetAuthorizationHeaderJwt(authHeader)
-				if err != nil {
-					log(">> JwtMiddleware: error converting Authorization header to JWT:", err)
+			// 1. Check for valid JWT token based on the Authorization header
+			jwtToken, err := getJwtFromRequest(r, jwtToolkit)
+			if err != nil {
+				log(">> JwtMiddleware: error getting JWT from request:", err)
+			}
+			doesRequestHaveJwt := jwtToken != nil && err == nil
+
+			if doesRequestHaveJwt {
+				// 2a. If JWT token found, just get the session key
+				claims, ok := jwtToken.Claims.(*jwtutil.CustomClaims)
+				if !ok {
+					log(">> JwtMiddleware: error converting JWT token to CustomClaims")
 				}
 
-				jwtToken = z
-				claims = jwtToken.Claims.(*jwtutil.CustomClaims)
-				authToken = strings.TrimPrefix(authHeader, "Bearer ")
-			}
+				sessionKey = claims.SessionKey
+			} else {
+				// 2b. If JWT token NOT found, create a new JWT token with session key
 
-			// If no JWT token found, create a new anonymous session
-			if jwtToken == nil {
 				// log(">> JwtMiddleware: no JWT token found")
-
-				claims = jwtutil.NewClaims(util.GenerateSessionKey())
-
-				zjwtToken, err := jwtToolkit.GenerateJwt(claims)
+				key := util.GenerateSessionKey()
+				claims := jwtutil.NewClaims(key)
+				tmp, err := jwtToolkit.GenerateJwt(claims)
 				if err != nil {
 					log(">> JwtMiddleware: error generating JWT:", err)
 				}
-				jwtToken = zjwtToken
+
+				sessionKey = key
+				jwtToken = tmp
 			}
 
-			// Sign the JWT token
-			if authToken == "" {
-				var z string
-				z, err := jwtToolkit.SignToken(jwtToken)
+			// 3. Check for a session linked to the JWT token's sessionKey
+			sess, ok := sessionContainer.Session(sessionKey)
+			if sess != nil && ok {
+				// 3a. If session is found, do nothing
+			} else {
+				if doesRequestHaveJwt {
+					// 3b. 🚨 If session is not found AND doesRequestHaveJwt == true, return unauthorized error
+
+					// NOTE: For now expired sessions will be auto-refreshed,
+					// so just create a session same as 3c
+					didAutoRefresh = true
+
+					log(">> JwtMiddleware: JWT token exists but no session found, for now just auto-creating a new session...")
+				}
+				// 3c. If session is not found AND doesRequestHaveJwt == false, create a new session
+				log(">> JwtMiddleware: no session found (most likely no client JWT detected)")
+
+				// Get the signed Auth token
+				authToken, err := jwtToolkit.SignToken(jwtToken)
 				if err != nil {
 					log(">> JwtMiddleware: error signing JWT:", err)
 				}
-				authToken = z
+				newAuthToken = &authToken
+
+				// Initialize a new session
+				if authToken != "" {
+					sess, _ = initNewSession(sessionKey, authToken, sessionContainer, sessionFactory, sessionTTL)
+					if sess == nil {
+						log(">> JwtMiddleware: error initializing new session")
+					}
+				}
 			}
 
-			// Check if the session exists
-			sess, err := requestToSession(r, sessionContainer, jwtToolkit)
-			if sess == nil || err != nil {
-				log(">> JwtMiddleware: no session found (most likely no client JWT detected)")
+			if sess == nil {
+				// !! Major error, just return unauthorized
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte("Unauthorized"))
+				return
+			}
 
-				sess, _ := sessionContainer.InitSession(claims.SessionKey, sessionFactory())
-				sess.Put("source", "gex.jwt_middleware")
-				sess.Put("token", authToken)
-				sess.Put("is_secure", false)
+			// 4. Check session expiration
+			isSessionExpired, err := isSessionExpired(sess)
+			if isSessionExpired || err != nil {
+				didAutoRefresh = true
 
+				log(">> JwtMiddleware: session expired, for now just auto-refreshing...")
+
+				// Initialize a new session
+				sess, _ = refreshSession(sess, sessionTTL)
+				if sess == nil {
+					log(">> JwtMiddleware: error initializing new session")
+				}
+			} else {
+				// 4b. If session is not expired, do nothing
+			}
+
+			// 5. Update session touched_at
+			if sess != nil {
+				sess.Put("touched_at", time.Now())
+			}
+
+			// 6. Determine current authToken
+			var authToken string
+			if newAuthToken != nil {
+				authToken = *newAuthToken
+			} else {
+				authTokenRaw, ok := sess.Get("token")
+				if !ok {
+					log(">> JwtMiddleware: error getting authToken from session")
+				}
+
+				authToken = authTokenRaw.(string)
 			}
 
 			rwrap := &responseWriterWrapper{
@@ -96,16 +170,86 @@ func JwtMiddleware(
 				body:           bytes.NewBuffer(nil),
 			}
 
+			// 6. Set the authToken in the Authorization request header and X-Auth-Token response header
+
 			// TODO hacky but for now we inject an Authorization header if its missing
 			if r.Header.Get("Authorization") == "" {
 				r.Header.Add("Authorization", "Bearer "+authToken)
 			}
-
 			rwrap.Header().Set("X-Auth-Token", authToken)
 
 			next.ServeHTTP(rwrap, r)
 
+			// Notify the client that the session was auto-refreshed
+			if didAutoRefresh {
+				w.Header().Add("GEX-Session-Auto-Refreshed", "true")
+			}
+
 			w.Write(rwrap.body.Bytes())
 		})
 	}
+}
+
+func getJwtFromRequest(r *http.Request, jwtToolkit *jwtutil.Toolkit) (*jwt.Token, error) {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return nil, fmt.Errorf("no Authorization header found")
+	}
+
+	// log(">> JwtMiddleware: found JWT token in Authorization header")
+	jwtToken, err := jwtToolkit.GetAuthorizationHeaderJwt(authHeader)
+	if err != nil {
+		log(">> JwtMiddleware: error converting Authorization header to JWT:", err)
+	}
+
+	return jwtToken, err
+}
+
+func initNewSession(sessionKey string, authToken string, sessionContainer *session.Container, sessionFactory SessionFactory, sessionTTL time.Duration) (session.SessionStorer, error) {
+	sess, _ := sessionContainer.InitSession(sessionKey, sessionFactory())
+	sess.Put("source", "gex.jwt_middleware")
+	sess.Put("token", authToken)
+	sess.Put("is_secure", false)
+
+	now := time.Now()
+	sess.Put("created_at", now)
+	sess.Put("expires_at", now.Add(sessionTTL))
+	sess.Put("touched_at", now)
+
+	return sess, nil
+}
+
+func refreshSession(sess session.SessionStorer, sessionTTL time.Duration) (session.SessionStorer, error) {
+	now := time.Now()
+	sess.Put("expires_at", now.Add(sessionTTL))
+	sess.Put("touched_at", now)
+
+	// Increment refresh count
+	refreshCountRaw, ok := sess.Get("refresh_count")
+	if !ok {
+		sess.Put("refresh_count", 1)
+	} else {
+		refreshCount, ok := refreshCountRaw.(int)
+		if !ok {
+			sess.Put("refresh_count", 1)
+		} else {
+			sess.Put("refresh_count", refreshCount+1)
+		}
+	}
+
+	return sess, nil
+}
+
+func isSessionExpired(sess session.SessionStorer) (bool, error) {
+	expiresAtRaw, ok := sess.Get("expires_at")
+	if !ok {
+		return false, fmt.Errorf("no expires_at found in session")
+	}
+
+	expiresAt, ok := expiresAtRaw.(time.Time)
+	if !ok {
+		return false, fmt.Errorf("error converting expires_at to time.Time")
+	}
+
+	return expiresAt.Before(time.Now()), nil
 }
