@@ -47,13 +47,13 @@ func JwtMiddleware(
 
 			// JWT Middleware Flow:
 			//
-			// 1. Check for valid JWT token based on the Authorization header, set result to doesRequestHaveJwt
+			// 1. Check for valid JWT token based on the Authorization header, set result to thereIsAnIncomingJwt
 			// 2a. If JWT token found, just get the session key
 			// 2b. If JWT token NOT found, create a new JWT token with session key
 			// 3. Check for a session linked to the JWT token's sessionKey
 			// 3a. If session is found, do nothing
-			// 3b. 🚨 If session is not found AND doesRequestHaveJwt == true, return unauthorized error
-			// 3c. If session is not found AND doesRequestHaveJwt == false, create a new session
+			// 3b. 🚨 If session is not found AND thereIsAnIncomingJwt == true, return unauthorized error
+			// 3c. If session is not found AND thereIsAnIncomingJwt == false, create a new session
 			// 4. Check session expiration
 			// 4a. 🚨 If session is expired, return unauthorized error
 			// 4b. If session is not expired, do nothing
@@ -66,9 +66,9 @@ func JwtMiddleware(
 			if err != nil {
 				log(">> JwtMiddleware: error getting JWT from request:", err)
 			}
-			doesRequestHaveJwt := jwtToken != nil && err == nil
+			thereIsAnIncomingJwt := jwtToken != nil && err == nil
 
-			if doesRequestHaveJwt {
+			if thereIsAnIncomingJwt {
 				// 2a. If JWT token found, just get the session key
 				claims, ok := jwtToken.Claims.(*jwtutil.CustomClaims)
 				if !ok {
@@ -83,8 +83,13 @@ func JwtMiddleware(
 				key := util.GenerateSessionKey()
 				claims := jwtutil.NewClaims(key)
 				tmp, err := jwtToolkit.GenerateJwt(claims)
-				if err != nil {
+				if tmp == nil || err != nil {
 					log(">> JwtMiddleware: error generating JWT:", err)
+
+					// !! Major error, just return unauthorized
+					w.WriteHeader(http.StatusUnauthorized)
+					w.Write([]byte("Unauthorized"))
+					return
 				}
 
 				sessionKey = key
@@ -96,8 +101,8 @@ func JwtMiddleware(
 			if sess != nil && ok {
 				// 3a. If session is found, do nothing
 			} else {
-				if doesRequestHaveJwt {
-					// 3b. 🚨 If session is not found AND doesRequestHaveJwt == true, return unauthorized error
+				if thereIsAnIncomingJwt {
+					// 3b. 🚨 If session is not found AND thereIsAnIncomingJwt == true, return unauthorized error
 
 					// NOTE: For now expired sessions will be auto-refreshed,
 					// so just create a session same as 3c
@@ -105,7 +110,7 @@ func JwtMiddleware(
 
 					log(">> JwtMiddleware: JWT token exists but no session found, for now just auto-creating a new session...")
 				}
-				// 3c. If session is not found AND doesRequestHaveJwt == false, create a new session
+				// 3c. If session is not found AND thereIsAnIncomingJwt == false, create a new session
 				log(">> JwtMiddleware: no session found (most likely no client JWT detected)")
 
 				// Get the signed Auth token

@@ -1,0 +1,109 @@
+# git branches
+# - <user> - user local development branch
+# - blend - development branch for development synchronization. not neccesary compilable
+# - stage - daily compile branch for internal development
+# - master - stable source brancj
+# - releases marked and pushed by labels.
+
+# key problems??
+# https://help.github.com/articles/generating-ssh-keys/
+# ssh-agent -s
+# ssh-add ~/.ssh/id_rsa  (note - juno is the common system user)
+
+/apps/one/<branchdir>/kex/README.git
+
+#clone <user>, blend, stage or master
+###########################################
+
+Step 1
+
+#clone
+cd /apps/one/mydir
+git clone https://github.com/KashinApp/kex.git
+
+#set origin
+cd /apps/one/mydir/kex
+git remote set-url origin git+ssh://git@github.com:/KashinApp/kex.git
+
+#set user.name
+git config user.name <githubname>
+git config user.email <githubemail>
+
+git checkout <userbranch>
+git status
+
+You're ready to work!
+------------------------------
+
+#### CHEATS ####
+
+# discard a working file
+git restore foo.java
+
+
+#clean or reset working files
+git reset --hard HEAD && git clean -f && git status
+
+------------------------------
+
+#### DAILY GIT PROCESS ####
+
+------------------------------
+#### AM - START OF DAY - sync daily development blend branch
+------------------------------
+a - go to the local directory /apps/one/<user>/KEX
+                         ie - /apps/one/rkl/KEX
+
+  0 - git checkout blend
+  1 - git pull
+  2 - git checkout <userBranch>
+  3 - git merge blend
+  4 - git push
+
+------------------------------
+#### PM - END OF DAY - to sync or baseline nightly
+------------------------------
+a - go to the local directory /apps/one/<user>/KEX
+                         ie - /apps/one/rkl/KEX
+
+  0 - git checkout <userBranch>
+  2 - git add . --all
+  3 - git commit -m <commitMessage>
+  4 - git push
+
+  5 - git checkout blend
+  6 - git pull
+  7 - git merge <userBranch>
+  8 - git push
+  9 - git checkout <userBranch>
+
+--------------------------
+#### PULL - latest codes - blend, stage or master local
+--------------------------
+a - go to the local directory
+    ie - /apps/one/stage/KEX or /apps/one/master/KEX
+
+  0 - git status
+  1 - git checkout <blend|stage|master>
+  2 - git pull
+
+EXAMPLE SYNC - blend to stage
+--------------------------
+a - go to blend directory
+    ie - /apps/one/stage/KEX
+
+  0 - git checkout stage
+  1 - git pull
+  2 - git merge blend
+  3 - git push
+  4 - git checkout blend
+
+------------------
+
+# list all files tracked but in gitignore
+git ls-files --others --ignored --exclude-standard
+
+git check-ignore -v $(git ls-files)
+
+# remove tracked file from repo
+git rm --cached <file>
