@@ -208,20 +208,24 @@ func JwtMiddleware(
 }
 
 func writeError(w http.ResponseWriter, err error) {
+	w.WriteHeader(http.StatusInternalServerError)
+	w.Header().Set("Content-Type", "application/json")
+
 	resp := map[string]string{
 		"error":  "gex panic: " + err.Error(),
 		"origin": "jwt_middleware",
 	}
 	json.NewEncoder(w).Encode(resp)
-
-	w.WriteHeader(http.StatusUnauthorized)
-	w.Header().Set("Content-Type", "application/json")
 }
 
 func getJwtFromRequest(r *http.Request, jwtToolkit *jwtutil.Toolkit) (*jwt.Token, error) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		return nil, fmt.Errorf("no Authorization header found")
+	}
+
+	if authHeader == "Bearer " {
+		return nil, fmt.Errorf("no JWT token found in Authorization header")
 	}
 
 	// log(">> JwtMiddleware: found JWT token in Authorization header")
