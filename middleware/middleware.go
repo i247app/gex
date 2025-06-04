@@ -182,41 +182,44 @@ func JwtMiddleware(
 				authToken = authTokenRaw.(string)
 			}
 
-			rwrap := &responseWriterWrapper{
+			// 6. Set the authToken in the Authorization request header and X-Auth-Token response header
+
+			// Wrap the response writer to capture the response body
+			wr := &responseWriterWrapper{
 				ResponseWriter: w,
 				body:           bytes.NewBuffer(nil),
 			}
-
-			// 6. Set the authToken in the Authorization request header and X-Auth-Token response header
 
 			// TODO hacky but for now we inject an Authorization header if its missing
 			if r.Header.Get("Authorization") == "" {
 				r.Header.Add("Authorization", "Bearer "+authToken)
 			}
-			rwrap.Header().Set("X-Auth-Token", authToken)
+			wr.Header().Set("X-Auth-Token", authToken)
 
-			next.ServeHTTP(rwrap, r)
+			next.ServeHTTP(wr, r)
 
 			// Notify the client that the session was auto-refreshed
 			if didAutoRefresh {
 				w.Header().Add("GEX-Session-Auto-Refreshed", "true")
 			}
 
-			w.WriteHeader(rwrap.statusCode)
-			w.Write(rwrap.body.Bytes())
+			if wr.statusCode != 0 {
+				w.WriteHeader(wr.statusCode)
+			}
+			w.Write(wr.body.Bytes())
 		})
 	}
 }
 
 func writeError(w http.ResponseWriter, tag string, err error) {
-	w.WriteHeader(http.StatusInternalServerError)
-	w.Header().Set("Content-Type", "application/json")
-
 	resp := map[string]string{
 		"error":  "gex panic: " + err.Error(),
 		"tag":    tag,
 		"origin": "jwt_middleware",
 	}
+
+	w.WriteHeader(http.StatusInternalServerError)
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
 }
 

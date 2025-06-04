@@ -23,5 +23,4 @@ func (w *responseWriterWrapper) Header() http.Header {
 // Implement WriteHeader to capture the status code
 func (w *responseWriterWrapper) WriteHeader(statusCode int) {
 	w.statusCode = statusCode
-	// w.ResponseWriter.WriteHeader(statusCode)
 }
