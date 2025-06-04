@@ -70,7 +70,7 @@ func JwtMiddleware(
 			jwtToken, err := getJwtFromRequest(r, jwtToolkit)
 			if err == ErrMalformedJwt {
 				log(">> JwtMiddleware: totally malformed JWT token, returning unauthorized...")
-				writeError(w, fmt.Errorf("Unauthorized"))
+				writeError(w, "malformed jwt", fmt.Errorf("Unauthorized"))
 				return
 			} else if jwtToken == nil || err != nil {
 				log(">> JwtMiddleware: error getting JWT from request:", err)
@@ -100,7 +100,7 @@ func JwtMiddleware(
 					log(">> JwtMiddleware: error generating JWT:", err)
 
 					// !! Major error, just return unauthorized
-					writeError(w, fmt.Errorf("Unauthorized"))
+					writeError(w, "error creating new jwt", fmt.Errorf("Unauthorized"))
 					return
 				}
 
@@ -144,7 +144,7 @@ func JwtMiddleware(
 
 			if sess == nil {
 				// !! Major error, just return unauthorized
-				writeError(w, fmt.Errorf("Unauthorized"))
+				writeError(w, "post session block and session is still nil", fmt.Errorf("Unauthorized"))
 				return
 			}
 
@@ -202,17 +202,19 @@ func JwtMiddleware(
 				w.Header().Add("GEX-Session-Auto-Refreshed", "true")
 			}
 
+			w.WriteHeader(rwrap.statusCode)
 			w.Write(rwrap.body.Bytes())
 		})
 	}
 }
 
-func writeError(w http.ResponseWriter, err error) {
+func writeError(w http.ResponseWriter, tag string, err error) {
 	w.WriteHeader(http.StatusInternalServerError)
 	w.Header().Set("Content-Type", "application/json")
 
 	resp := map[string]string{
 		"error":  "gex panic: " + err.Error(),
+		"tag":    tag,
 		"origin": "jwt_middleware",
 	}
 	json.NewEncoder(w).Encode(resp)

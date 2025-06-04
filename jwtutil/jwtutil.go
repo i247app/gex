@@ -105,9 +105,12 @@ func (t *Toolkit) GetAuthorizationHeaderJwt(authorizationHeader string) (*jwt.To
 	if !strings.HasPrefix(authorizationHeader, "Bearer ") {
 		return nil, fmt.Errorf("malformed Authorization header, doesn't start with Bearer")
 	}
-	var claims CustomClaims
 	tokenString := strings.TrimPrefix(authorizationHeader, "Bearer ")
-	return t.StringToToken(tokenString, &claims)
+	tok, err := t.StringToToken(tokenString, &CustomClaims{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse JWT token: %w", err)
+	}
+	return tok, nil
 }
 
 func (t *Toolkit) GetRequestJwt(r *http.Request) (*jwt.Token, error) {
