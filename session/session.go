@@ -1,5 +1,7 @@
 package session
 
+import "sync"
+
 // SessionStorer is an interface that defines the methods for a session store.
 type SessionStorer interface {
 	Put(key string, value any)
@@ -8,7 +10,8 @@ type SessionStorer interface {
 
 // Container is a container for sessions.
 type Container struct {
-	sessions map[string]SessionStorer
+	sessions      map[string]SessionStorer
+	sessionsMutex sync.Mutex
 }
 
 func NewContainer() *Container {
@@ -17,6 +20,9 @@ func NewContainer() *Container {
 
 // Session is used to get a session from the container.
 func (s *Container) Session(sessionKey string) (SessionStorer, bool) {
+	s.sessionsMutex.Lock()
+	defer s.sessionsMutex.Unlock()
+
 	session, ok := s.sessions[sessionKey]
 	if !ok {
 		return nil, false
@@ -32,6 +38,9 @@ func (s *Container) Sessions() *map[string]SessionStorer {
 // InitSession is used to initialize a session with a given key.
 // It accepts a session object to initialize the session with.
 func (s *Container) InitSession(sessionKey string, sess SessionStorer) (SessionStorer, bool) {
+	s.sessionsMutex.Lock()
+	defer s.sessionsMutex.Unlock()
+
 	if _, ok := s.sessions[sessionKey]; ok {
 		return nil, false
 	}
@@ -41,5 +50,8 @@ func (s *Container) InitSession(sessionKey string, sess SessionStorer) (SessionS
 }
 
 func (s *Container) DeleteSession(sessionKey string) {
+	s.sessionsMutex.Lock()
+	defer s.sessionsMutex.Unlock()
+
 	delete(s.sessions, sessionKey)
 }
