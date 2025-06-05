@@ -68,25 +68,25 @@ func JwtMiddleware(
 			// 1. Check for valid JWT token based on the Authorization header
 			var inJwtSessionKey *string
 			jwtToken, err := getJwtFromRequest(r, jwtToolkit)
-			if err == ErrMalformedJwt {
-				log(">> JwtMiddleware: totally malformed JWT token, returning unauthorized...")
-				writeError(w, "malformed jwt", fmt.Errorf("Unauthorized"))
-				return
-			} else if jwtToken == nil || err != nil {
-				log(">> JwtMiddleware: error getting JWT from request:", err)
-			} else {
-				claims, ok := jwtToken.Claims.(*jwtutil.CustomClaims)
-				if ok {
-					inJwtSessionKey = &claims.SessionKey
-				}
-			}
 			isValidIncomingJwt := err == nil && jwtToken != nil && inJwtSessionKey != nil
+
+			if err == ErrMalformedJwt {
+				log(">> JwtMiddleware: WARNING ignoring your jwt token - totally malformed JWT token")
+			} else if jwtToken == nil || err != nil {
+				log(">> JwtMiddleware: WARNING ignoring your jwt token - error getting JWT from request:", err)
+			} else {
+				log(">> JwtMiddleware: jwt ok")
+			}
 
 			if isValidIncomingJwt {
 				// 2a. If JWT token found, just get the session key
 
 				log(">> JwtMiddleware: found valid JWT token, using session key from claims...")
 
+				claims, ok := jwtToken.Claims.(*jwtutil.CustomClaims)
+				if ok {
+					inJwtSessionKey = &claims.SessionKey
+				}
 				sessionKey = *inJwtSessionKey
 			} else {
 				// 2b. If JWT token NOT found, create a new JWT token with session key
@@ -236,7 +236,7 @@ func getJwtFromRequest(r *http.Request, jwtToolkit *jwtutil.Toolkit) (*jwt.Token
 	// log(">> JwtMiddleware: found JWT token in Authorization header")
 	jwtToken, err := jwtToolkit.GetAuthorizationHeaderJwt(authHeader)
 	if err != nil {
-		log(">> JwtMiddleware: error converting Authorization header to JWT:", err)
+		// log(">> JwtMiddleware: error converting Authorization header to JWT:", err)
 		return nil, ErrMalformedJwt
 	}
 
