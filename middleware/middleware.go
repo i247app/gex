@@ -242,6 +242,7 @@ func createNewJwtToken(jwtToolkit *jwtutil.Toolkit, sessionKey string) (*jwt.Tok
 
 func initNewSession(sessionKey string, authToken string, sessionContainer *session.Container, sessionFactory SessionFactory, sessionTTL time.Duration) (session.SessionStorer, error) {
 	sess, _ := sessionContainer.InitSession(sessionKey, sessionFactory())
+	sess.Put("key", sessionKey)
 	sess.Put("source", "gex.jwt_middleware")
 	sess.Put("token", authToken)
 	sess.Put("is_secure", false)
