@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -33,6 +32,7 @@ func JwtMiddleware(
 	jwtToolkit *jwtutil.Toolkit,
 	sessionFactory SessionFactory,
 	sessionTTL time.Duration,
+	sessionContextKey session.SessionRequestContextKey,
 ) func(http.Handler) http.Handler {
 
 	return func(next http.Handler) http.Handler {
@@ -51,9 +51,9 @@ func JwtMiddleware(
 
 			// 1. Get or create a JWT token
 			jwtResult, err := getOrCreateJwtToken(r, jwtToolkit)
-			var isValidIncomingJwt bool = err == nil && jwtResult.JwtToken != nil && jwtResult.SessionKey != ""
-			if !isValidIncomingJwt {
-				writeError(w, "error getting or creating jwt", fmt.Errorf("Unauthorized"))
+			var isValidJwt bool = err == nil && jwtResult.JwtToken != nil && jwtResult.SessionKey != ""
+			if !isValidJwt {
+				writeError(w, "error getting or creating jwt", "jwt_middleware", fmt.Errorf("Unauthorized"))
 				return
 			}
 			sessionKey = jwtResult.SessionKey
@@ -62,10 +62,10 @@ func JwtMiddleware(
 			// 2. Get session
 			sess, ok := getSessionFromSessionKey(sessionContainer, sessionKey)
 			if sess == nil || !ok {
-				tmp, err := initNewSession(sessionKey, authToken, sessionContainer, sessionFactory, sessionTTL)
+				tmp, err := initNewSession(sessionKey, authToken, "gex.jwt_middleware", sessionContainer, sessionFactory, sessionTTL)
 				if tmp == nil || err != nil {
 					log(">> JwtMiddleware: error initializing new session")
-					writeError(w, "error initializing new session", fmt.Errorf("Unauthorized"))
+					writeError(w, "error initializing new session", "jwt_middleware", fmt.Errorf("Unauthorized"))
 					return
 				}
 				sess = tmp
@@ -80,7 +80,7 @@ func JwtMiddleware(
 				sess, _ = refreshSession(sess, sessionTTL)
 				if sess == nil {
 					log(">> JwtMiddleware: error refreshing expired session")
-					writeError(w, "error refreshing expired session", fmt.Errorf("Unauthorized"))
+					writeError(w, "error refreshing expired session", "jwt_middleware", fmt.Errorf("Unauthorized"))
 					return
 				}
 			}
@@ -102,6 +102,9 @@ func JwtMiddleware(
 			}
 			wr.Header().Set("X-Auth-Token", authToken)
 
+			// Add session to request context
+			r = addSessionToRequestContext(r, sessionContextKey, sess)
+
 			next.ServeHTTP(wr, r)
 
 			// Notify the client that the session was auto-refreshed
@@ -121,18 +124,6 @@ func getSessionFromSessionKey(sessionContainer *session.Container, sessionKey st
 	return sessionContainer.Session(sessionKey)
 }
 
-func writeError(w http.ResponseWriter, tag string, err error) {
-	resp := map[string]string{
-		"error":  "gex panic: " + err.Error(),
-		"tag":    tag,
-		"origin": "jwt_middleware",
-	}
-
-	w.WriteHeader(http.StatusInternalServerError)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
-}
-
 type JwtResult struct {
 	JwtToken   *jwt.Token
 	SessionKey string
@@ -142,11 +133,7 @@ type JwtResult struct {
 func getOrCreateJwtToken(r *http.Request, jwtToolkit *jwtutil.Toolkit) (*JwtResult, error) {
 	jwtResult, err := getValidJwtFromRequest(r, jwtToolkit)
 	if jwtResult != nil && err == nil {
-		return &JwtResult{
-			JwtToken:   jwtResult.JwtToken,
-			SessionKey: jwtResult.SessionKey,
-			AuthToken:  jwtResult.AuthToken,
-		}, nil
+		return jwtResult, nil
 	}
 
 	// Failed to get a valid JWT token from the request
@@ -240,10 +227,10 @@ func createNewJwtToken(jwtToolkit *jwtutil.Toolkit, sessionKey string) (*jwt.Tok
 	return jwtToken, nil
 }
 
-func initNewSession(sessionKey string, authToken string, sessionContainer *session.Container, sessionFactory SessionFactory, sessionTTL time.Duration) (session.SessionStorer, error) {
+func initNewSession(sessionKey string, authToken string, source string, sessionContainer *session.Container, sessionFactory SessionFactory, sessionTTL time.Duration) (session.SessionStorer, error) {
 	sess, _ := sessionContainer.InitSession(sessionKey, sessionFactory())
 	sess.Put("key", sessionKey)
-	sess.Put("source", "gex.jwt_middleware")
+	sess.Put("source", source)
 	sess.Put("token", authToken)
 	sess.Put("is_secure", false)
 
