@@ -105,6 +105,7 @@ func (a *App) Start() error {
 
 	// Wait for shutdown signal
 	<-ctx.Done()
+	fmt.Println("Shutdown signal received, shutting down server...")
 
 	// Call all shutdown hooks
 	for _, hook := range a.onShutdown {
