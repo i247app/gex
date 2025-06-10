@@ -1,18 +1,14 @@
-package session
+package sessionprovider
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/golang-jwt/jwt"
 	"github.com/i247app/gex/jwtutil"
+	"github.com/i247app/gex/session"
 	"github.com/i247app/gex/util"
-)
-
-var (
-	ErrMalformedJwt = errors.New("invalid or malformed JWT")
 )
 
 type JwtResult struct {
@@ -23,7 +19,7 @@ type JwtResult struct {
 
 // JwtSessionProvider implements SessionProvider for JWT-based authentication
 type JwtSessionProvider struct {
-	sessionContainer *Container
+	sessionContainer *session.Container
 	jwtToolkit       *jwtutil.Toolkit
 	sessionFactory   SessionFactory
 	sessionTTL       time.Duration
@@ -31,7 +27,7 @@ type JwtSessionProvider struct {
 
 // NewJwtSessionProvider creates a new JWT session provider
 func NewJwtSessionProvider(
-	sessionContainer *Container,
+	sessionContainer *session.Container,
 	jwtToolkit *jwtutil.Toolkit,
 	sessionFactory SessionFactory,
 	sessionTTL time.Duration,
@@ -44,26 +40,9 @@ func NewJwtSessionProvider(
 	}
 }
 
-// GetSession implements SessionProvider interface for JWT authentication
-func (j *JwtSessionProvider) GetSession(r *http.Request) (SessionStorer, error) {
-	result, err := j.GetSessionWithMetadata(r)
-	if err != nil {
-		return nil, err
-	}
-	if result == nil {
-		return nil, nil
-	}
-	return result.Session, nil
-}
-
 // GetSessionWithMetadata implements SessionProvider interface with additional metadata
-func (j *JwtSessionProvider) GetSessionWithMetadata(r *http.Request) (*SessionResult, error) {
+func (j *JwtSessionProvider) GetSessionFromRequest(r *http.Request) (*SessionResult, error) {
 	var didAutoRefresh bool
-
-	// Skip session handling if this header is set
-	if r.Header.Get("X-Skip-Session") == "true" {
-		return nil, nil
-	}
 
 	// 1. Get or create a JWT token
 	jwtResult, err := j.getOrCreateJwtToken(r)
@@ -204,7 +183,7 @@ func (j *JwtSessionProvider) createNewJwtToken(sessionKey string) (*jwt.Token, e
 	return jwtToken, nil
 }
 
-func (j *JwtSessionProvider) initNewSession(sessionKey string, authToken string, source string) (SessionStorer, error) {
+func (j *JwtSessionProvider) initNewSession(sessionKey string, authToken string, source string) (session.SessionStorer, error) {
 	sess, _ := j.sessionContainer.InitSession(sessionKey, j.sessionFactory())
 	sess.Put("key", sessionKey)
 	sess.Put("source", source)
@@ -219,7 +198,7 @@ func (j *JwtSessionProvider) initNewSession(sessionKey string, authToken string,
 	return sess, nil
 }
 
-func (j *JwtSessionProvider) refreshSession(sess SessionStorer) (SessionStorer, error) {
+func (j *JwtSessionProvider) refreshSession(sess session.SessionStorer) (session.SessionStorer, error) {
 	now := time.Now()
 	sess.Put("expires_at", now.Add(j.sessionTTL))
 	sess.Put("touched_at", now)
@@ -240,7 +219,7 @@ func (j *JwtSessionProvider) refreshSession(sess SessionStorer) (SessionStorer, 
 	return sess, nil
 }
 
-func (j *JwtSessionProvider) isSessionExpired(sess SessionStorer) (bool, error) {
+func (j *JwtSessionProvider) isSessionExpired(sess session.SessionStorer) (bool, error) {
 	expiresAtRaw, ok := sess.Get("expires_at")
 	if !ok {
 		return false, fmt.Errorf("no expires_at found in session")

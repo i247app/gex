@@ -1,4 +1,4 @@
-package session
+package sessionprovider
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/i247app/gex/jwtutil"
+	"github.com/i247app/gex/session"
 )
 
 type XwtResult struct {
@@ -16,7 +17,7 @@ type XwtResult struct {
 
 // XwtSessionProvider implements SessionProvider for XWT-based authentication
 type XwtSessionProvider struct {
-	sessionContainer *Container
+	sessionContainer *session.Container
 	jwtToolkit       *jwtutil.Toolkit
 	sessionFactory   SessionFactory
 	sessionTTL       time.Duration
@@ -24,7 +25,7 @@ type XwtSessionProvider struct {
 
 // NewXwtSessionProvider creates a new XWT session provider
 func NewXwtSessionProvider(
-	sessionContainer *Container,
+	sessionContainer *session.Container,
 	jwtToolkit *jwtutil.Toolkit,
 	sessionFactory SessionFactory,
 	sessionTTL time.Duration,
@@ -37,26 +38,9 @@ func NewXwtSessionProvider(
 	}
 }
 
-// GetSession implements SessionProvider interface for XWT authentication
-func (x *XwtSessionProvider) GetSession(r *http.Request) (SessionStorer, error) {
-	result, err := x.GetSessionWithMetadata(r)
-	if err != nil {
-		return nil, err
-	}
-	if result == nil {
-		return nil, nil
-	}
-	return result.Session, nil
-}
-
 // GetSessionWithMetadata implements SessionProvider interface with additional metadata
-func (x *XwtSessionProvider) GetSessionWithMetadata(r *http.Request) (*SessionResult, error) {
+func (x *XwtSessionProvider) GetSessionFromRequest(r *http.Request) (*SessionResult, error) {
 	var didAutoRefresh bool
-
-	// Skip session handling if this header is set
-	if r.Header.Get("X-Skip-Session") == "true" {
-		return nil, nil
-	}
 
 	// 1. Get or create a XWT token
 	xwtResult, err := x.getOrCreateXwtToken(r)
@@ -164,7 +148,7 @@ func (x *XwtSessionProvider) createNewXwtToken() (*XwtResult, error) {
 	}, nil
 }
 
-func (x *XwtSessionProvider) initNewSession(sessionKey string, authToken string, source string) (SessionStorer, error) {
+func (x *XwtSessionProvider) initNewSession(sessionKey string, authToken string, source string) (session.SessionStorer, error) {
 	sess, _ := x.sessionContainer.InitSession(sessionKey, x.sessionFactory())
 	sess.Put("key", sessionKey)
 	sess.Put("source", source)
@@ -179,7 +163,7 @@ func (x *XwtSessionProvider) initNewSession(sessionKey string, authToken string,
 	return sess, nil
 }
 
-func (x *XwtSessionProvider) refreshSession(sess SessionStorer) (SessionStorer, error) {
+func (x *XwtSessionProvider) refreshSession(sess session.SessionStorer) (session.SessionStorer, error) {
 	now := time.Now()
 	sess.Put("expires_at", now.Add(x.sessionTTL))
 	sess.Put("touched_at", now)
@@ -200,7 +184,7 @@ func (x *XwtSessionProvider) refreshSession(sess SessionStorer) (SessionStorer, 
 	return sess, nil
 }
 
-func (x *XwtSessionProvider) isSessionExpired(sess SessionStorer) (bool, error) {
+func (x *XwtSessionProvider) isSessionExpired(sess session.SessionStorer) (bool, error) {
 	expiresAtRaw, ok := sess.Get("expires_at")
 	if !ok {
 		return false, fmt.Errorf("no expires_at found in session")

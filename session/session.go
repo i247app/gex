@@ -2,8 +2,6 @@ package session
 
 import "sync"
 
-type SessionRequestContextKey string
-
 // SessionStorer is an interface that defines the methods for a session store.
 type SessionStorer interface {
 	Put(key string, value any)
