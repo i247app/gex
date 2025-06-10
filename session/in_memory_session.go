@@ -19,6 +19,9 @@ func (s *InMemorySession) Put(key string, value any) {
 }
 
 func (s *InMemorySession) Get(key string) (any, bool) {
+	s.dataMutex.Lock()
+	defer s.dataMutex.Unlock()
+
 	value, ok := s.Data[key]
 	return value, ok
 }
