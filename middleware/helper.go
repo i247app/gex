@@ -9,17 +9,10 @@ import (
 	"github.com/i247app/gex/session"
 )
 
-// SessionResult contains the session and metadata about the session retrieval
-type SessionResult struct {
-	Session        session.SessionStorer
-	DidAutoRefresh bool
-	AuthToken      string
-}
-
 type SessionProvider interface {
 	GetSession(r *http.Request) (session.SessionStorer, error)
 	// GetSessionWithMetadata returns session along with metadata about the operation
-	GetSessionWithMetadata(r *http.Request) (*SessionResult, error)
+	GetSessionWithMetadata(r *http.Request) (*session.SessionResult, error)
 }
 
 func addSessionToRequestContext(r *http.Request, key session.SessionRequestContextKey, sess session.SessionStorer) *http.Request {

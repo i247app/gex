@@ -1,4 +1,4 @@
-package middleware
+package session
 
 import (
 	"fmt"
@@ -7,12 +7,16 @@ import (
 	"time"
 
 	"github.com/i247app/gex/jwtutil"
-	"github.com/i247app/gex/session"
 )
+
+type XwtResult struct {
+	XwtToken   string
+	SessionKey string
+}
 
 // XwtSessionProvider implements SessionProvider for XWT-based authentication
 type XwtSessionProvider struct {
-	sessionContainer *session.Container
+	sessionContainer *Container
 	jwtToolkit       *jwtutil.Toolkit
 	sessionFactory   SessionFactory
 	sessionTTL       time.Duration
@@ -20,7 +24,7 @@ type XwtSessionProvider struct {
 
 // NewXwtSessionProvider creates a new XWT session provider
 func NewXwtSessionProvider(
-	sessionContainer *session.Container,
+	sessionContainer *Container,
 	jwtToolkit *jwtutil.Toolkit,
 	sessionFactory SessionFactory,
 	sessionTTL time.Duration,
@@ -34,7 +38,7 @@ func NewXwtSessionProvider(
 }
 
 // GetSession implements SessionProvider interface for XWT authentication
-func (x *XwtSessionProvider) GetSession(r *http.Request) (session.SessionStorer, error) {
+func (x *XwtSessionProvider) GetSession(r *http.Request) (SessionStorer, error) {
 	result, err := x.GetSessionWithMetadata(r)
 	if err != nil {
 		return nil, err
@@ -160,7 +164,7 @@ func (x *XwtSessionProvider) createNewXwtToken() (*XwtResult, error) {
 	}, nil
 }
 
-func (x *XwtSessionProvider) initNewSession(sessionKey string, authToken string, source string) (session.SessionStorer, error) {
+func (x *XwtSessionProvider) initNewSession(sessionKey string, authToken string, source string) (SessionStorer, error) {
 	sess, _ := x.sessionContainer.InitSession(sessionKey, x.sessionFactory())
 	sess.Put("key", sessionKey)
 	sess.Put("source", source)
@@ -175,7 +179,7 @@ func (x *XwtSessionProvider) initNewSession(sessionKey string, authToken string,
 	return sess, nil
 }
 
-func (x *XwtSessionProvider) refreshSession(sess session.SessionStorer) (session.SessionStorer, error) {
+func (x *XwtSessionProvider) refreshSession(sess SessionStorer) (SessionStorer, error) {
 	now := time.Now()
 	sess.Put("expires_at", now.Add(x.sessionTTL))
 	sess.Put("touched_at", now)
@@ -196,7 +200,7 @@ func (x *XwtSessionProvider) refreshSession(sess session.SessionStorer) (session
 	return sess, nil
 }
 
-func (x *XwtSessionProvider) isSessionExpired(sess session.SessionStorer) (bool, error) {
+func (x *XwtSessionProvider) isSessionExpired(sess SessionStorer) (bool, error) {
 	expiresAtRaw, ok := sess.Get("expires_at")
 	if !ok {
 		return false, fmt.Errorf("no expires_at found in session")

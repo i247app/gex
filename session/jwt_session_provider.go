@@ -1,19 +1,29 @@
-package middleware
+package session
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/golang-jwt/jwt"
 	"github.com/i247app/gex/jwtutil"
-	"github.com/i247app/gex/session"
 	"github.com/i247app/gex/util"
 )
 
+var (
+	ErrMalformedJwt = errors.New("invalid or malformed JWT")
+)
+
+type JwtResult struct {
+	JwtToken   *jwt.Token
+	SessionKey string
+	AuthToken  string
+}
+
 // JwtSessionProvider implements SessionProvider for JWT-based authentication
 type JwtSessionProvider struct {
-	sessionContainer *session.Container
+	sessionContainer *Container
 	jwtToolkit       *jwtutil.Toolkit
 	sessionFactory   SessionFactory
 	sessionTTL       time.Duration
@@ -21,7 +31,7 @@ type JwtSessionProvider struct {
 
 // NewJwtSessionProvider creates a new JWT session provider
 func NewJwtSessionProvider(
-	sessionContainer *session.Container,
+	sessionContainer *Container,
 	jwtToolkit *jwtutil.Toolkit,
 	sessionFactory SessionFactory,
 	sessionTTL time.Duration,
@@ -35,7 +45,7 @@ func NewJwtSessionProvider(
 }
 
 // GetSession implements SessionProvider interface for JWT authentication
-func (j *JwtSessionProvider) GetSession(r *http.Request) (session.SessionStorer, error) {
+func (j *JwtSessionProvider) GetSession(r *http.Request) (SessionStorer, error) {
 	result, err := j.GetSessionWithMetadata(r)
 	if err != nil {
 		return nil, err
@@ -194,7 +204,7 @@ func (j *JwtSessionProvider) createNewJwtToken(sessionKey string) (*jwt.Token, e
 	return jwtToken, nil
 }
 
-func (j *JwtSessionProvider) initNewSession(sessionKey string, authToken string, source string) (session.SessionStorer, error) {
+func (j *JwtSessionProvider) initNewSession(sessionKey string, authToken string, source string) (SessionStorer, error) {
 	sess, _ := j.sessionContainer.InitSession(sessionKey, j.sessionFactory())
 	sess.Put("key", sessionKey)
 	sess.Put("source", source)
@@ -209,7 +219,7 @@ func (j *JwtSessionProvider) initNewSession(sessionKey string, authToken string,
 	return sess, nil
 }
 
-func (j *JwtSessionProvider) refreshSession(sess session.SessionStorer) (session.SessionStorer, error) {
+func (j *JwtSessionProvider) refreshSession(sess SessionStorer) (SessionStorer, error) {
 	now := time.Now()
 	sess.Put("expires_at", now.Add(j.sessionTTL))
 	sess.Put("touched_at", now)
@@ -230,7 +240,7 @@ func (j *JwtSessionProvider) refreshSession(sess session.SessionStorer) (session
 	return sess, nil
 }
 
-func (j *JwtSessionProvider) isSessionExpired(sess session.SessionStorer) (bool, error) {
+func (j *JwtSessionProvider) isSessionExpired(sess SessionStorer) (bool, error) {
 	expiresAtRaw, ok := sess.Get("expires_at")
 	if !ok {
 		return false, fmt.Errorf("no expires_at found in session")
