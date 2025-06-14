@@ -69,7 +69,7 @@ func JwtMiddleware(
 			var inJwtSessionKey *string
 			jwtToken, err := getJwtFromRequest(r, jwtToolkit)
 			if err == ErrMalformedJwt {
-				log(">> JwtMiddleware: xxx totally malformed JWT token, returning unauthorized...")
+				log(">> JwtMiddleware: unknown or malformed JWT gen new jwt and session...")
 				// writeError(w, "malformed jwt", fmt.Errorf("Unauthorized"))
 				// return
 			} else if jwtToken == nil || err != nil {
