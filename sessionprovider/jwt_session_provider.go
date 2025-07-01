@@ -76,11 +76,6 @@ func (j *JwtSessionProvider) GetSessionFromRequest(r *http.Request) (*SessionRes
 	// 4. Update session touched_at
 	sess.Put("touched_at", time.Now())
 
-	// 5. Set auth token in request header for downstream handlers
-	if r.Header.Get("Authorization") == "" {
-		r.Header.Add("Authorization", "Bearer "+authToken)
-	}
-
 	return &SessionResult{
 		Session:        sess,
 		DidAutoRefresh: didAutoRefresh,
@@ -159,10 +154,19 @@ func (j *JwtSessionProvider) getValidJwtFromRequest(r *http.Request) (*JwtResult
 		return nil, fmt.Errorf("no session key found in JWT token")
 	}
 
-	// Validate authToken
+	// Extract authToken from JWT token
 	authToken, err := j.getAuthTokenFromJwtToken(jwtToken)
 	if authToken == "" || err != nil {
 		return nil, fmt.Errorf("error getting authToken from JWT token: %v", err)
+	}
+
+	// Run j.getAuthTokenFromJwtToken(jwtToken) 10 times and print the result
+	for i := 0; i < 10; i++ {
+		authToken, err := j.getAuthTokenFromJwtToken(jwtToken)
+		if authToken == "" || err != nil {
+			return nil, fmt.Errorf("error getting authToken from JWT token: %v", err)
+		}
+		log(">> JwtSessionProvider: [", i, "] authToken:", authToken)
 	}
 
 	return &JwtResult{

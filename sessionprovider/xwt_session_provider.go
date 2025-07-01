@@ -74,11 +74,6 @@ func (x *XwtSessionProvider) GetSessionFromRequest(r *http.Request) (*SessionRes
 	// 4. Update session touched_at
 	sess.Put("touched_at", time.Now())
 
-	// 5. Set auth token in request header for downstream handlers
-	if r.Header.Get("Authorization") == "" {
-		r.Header.Add("Authorization", "Bearer "+authToken)
-	}
-
 	return &SessionResult{
 		Session:        sess,
 		DidAutoRefresh: didAutoRefresh,
