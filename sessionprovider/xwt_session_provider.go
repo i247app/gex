@@ -18,7 +18,7 @@ type XwtResult struct {
 // XwtSessionProvider implements SessionProvider for XWT-based authentication
 type XwtSessionProvider struct {
 	sessionContainer *session.Container
-	jwtToolkit       *jwtutil.Toolkit
+	jwtHelper        jwtutil.JwtHelper
 	sessionFactory   SessionFactory
 	sessionTTL       time.Duration
 }
@@ -26,13 +26,13 @@ type XwtSessionProvider struct {
 // NewXwtSessionProvider creates a new XWT session provider
 func NewXwtSessionProvider(
 	sessionContainer *session.Container,
-	jwtToolkit *jwtutil.Toolkit,
+	jwtHelper jwtutil.JwtHelper,
 	sessionFactory SessionFactory,
 	sessionTTL time.Duration,
 ) *XwtSessionProvider {
 	return &XwtSessionProvider{
 		sessionContainer: sessionContainer,
-		jwtToolkit:       jwtToolkit,
+		jwtHelper:        jwtHelper,
 		sessionFactory:   sessionFactory,
 		sessionTTL:       sessionTTL,
 	}
@@ -127,12 +127,12 @@ func (x *XwtSessionProvider) getValidXwtFromRequest(r *http.Request) (*XwtResult
 func (x *XwtSessionProvider) createNewXwtToken() (*XwtResult, error) {
 	sessionKey := "n/a" // util.GenerateSessionKey()
 	claims := jwtutil.NewClaims(sessionKey)
-	jwtToken, err := x.jwtToolkit.GenerateJwt(claims)
+	jwtToken, err := x.jwtHelper.GenerateJwt(claims)
 	if err != nil {
 		return nil, fmt.Errorf("error creating new XWT token: %v", err)
 	}
 
-	signedToken, err := x.jwtToolkit.SignToken(jwtToken)
+	signedToken, err := x.jwtHelper.SignToken(jwtToken)
 	if err != nil {
 		return nil, fmt.Errorf("error signing new XWT token: %v", err)
 	}

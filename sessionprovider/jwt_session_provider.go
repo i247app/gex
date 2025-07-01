@@ -20,7 +20,7 @@ type JwtResult struct {
 // JwtSessionProvider implements SessionProvider for JWT-based authentication
 type JwtSessionProvider struct {
 	sessionContainer *session.Container
-	jwtToolkit       *jwtutil.Toolkit
+	jwtHelper        jwtutil.JwtHelper
 	sessionFactory   SessionFactory
 	sessionTTL       time.Duration
 }
@@ -28,13 +28,13 @@ type JwtSessionProvider struct {
 // NewJwtSessionProvider creates a new JWT session provider
 func NewJwtSessionProvider(
 	sessionContainer *session.Container,
-	jwtToolkit *jwtutil.Toolkit,
+	jwtHelper jwtutil.JwtHelper,
 	sessionFactory SessionFactory,
 	sessionTTL time.Duration,
 ) *JwtSessionProvider {
 	return &JwtSessionProvider{
 		sessionContainer: sessionContainer,
-		jwtToolkit:       jwtToolkit,
+		jwtHelper:        jwtHelper,
 		sessionFactory:   sessionFactory,
 		sessionTTL:       sessionTTL,
 	}
@@ -118,7 +118,7 @@ func (j *JwtSessionProvider) getOrCreateJwtToken(r *http.Request) (*JwtResult, e
 }
 
 func (j *JwtSessionProvider) getAuthTokenFromJwtToken(jwtToken *jwt.Token) (string, error) {
-	authToken, err := j.jwtToolkit.SignToken(jwtToken)
+	authToken, err := j.jwtHelper.SignToken(jwtToken)
 	if authToken == "" || err != nil {
 		log(">> JwtSessionProvider: error signing JWT:", err)
 		return "", err
@@ -138,7 +138,7 @@ func (j *JwtSessionProvider) getValidJwtFromRequest(r *http.Request) (*JwtResult
 	}
 
 	// Get JWT Token
-	jwtToken, err := j.jwtToolkit.GetAuthorizationHeaderJwt(authHeader)
+	jwtToken, err := jwtutil.GetAuthorizationHeaderJwt(authHeader, j.jwtHelper)
 	if jwtToken == nil || err != nil {
 		return nil, ErrMalformedJwt
 	}
@@ -160,15 +160,6 @@ func (j *JwtSessionProvider) getValidJwtFromRequest(r *http.Request) (*JwtResult
 		return nil, fmt.Errorf("error getting authToken from JWT token: %v", err)
 	}
 
-	// Run j.getAuthTokenFromJwtToken(jwtToken) 10 times and print the result
-	for i := 0; i < 10; i++ {
-		authToken, err := j.getAuthTokenFromJwtToken(jwtToken)
-		if authToken == "" || err != nil {
-			return nil, fmt.Errorf("error getting authToken from JWT token: %v", err)
-		}
-		log(">> JwtSessionProvider: [", i, "] authToken:", authToken)
-	}
-
 	return &JwtResult{
 		JwtToken:   jwtToken,
 		SessionKey: claims.SessionKey,
@@ -179,7 +170,7 @@ func (j *JwtSessionProvider) getValidJwtFromRequest(r *http.Request) (*JwtResult
 func (j *JwtSessionProvider) createNewJwtToken(sessionKey string) (*jwt.Token, error) {
 	// Create a new JWT token with a new session key
 	claims := jwtutil.NewClaims(sessionKey)
-	jwtToken, err := j.jwtToolkit.GenerateJwt(claims)
+	jwtToken, err := j.jwtHelper.GenerateJwt(claims)
 	if jwtToken == nil || err != nil {
 		return nil, fmt.Errorf("error generating JWT: %v", err)
 	}
