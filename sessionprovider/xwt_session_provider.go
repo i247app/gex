@@ -143,6 +143,9 @@ func (x *XwtSessionProvider) createNewXwtToken() (*XwtResult, error) {
 	}, nil
 }
 
+// WARNING - is_secure is an application layer for determining login or nonymous session which is set oo login and logut
+// ex - on login success, set session.is_secure = true
+// ex - on logout success or not, set session.is_secure = false
 func (x *XwtSessionProvider) initNewSession(sessionKey string, authToken string, source string) (session.SessionStorer, error) {
 	sess, _ := x.sessionContainer.InitSession(sessionKey, x.sessionFactory())
 	sess.Put("key", sessionKey)
