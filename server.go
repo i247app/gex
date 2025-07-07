@@ -18,7 +18,7 @@ type HostConfig struct {
 	HttpsKeyFile  string
 }
 
-type App struct {
+type Server struct {
 	HostConfig HostConfig
 
 	mux        *gexMux
@@ -28,7 +28,7 @@ type App struct {
 
 type Middleware func(http.Handler) http.Handler
 
-func NewApp(hostConfig HostConfig, defaultRoute http.HandlerFunc) *App {
+func NewServer(hostConfig HostConfig, defaultRoute http.HandlerFunc) *Server {
 	// Create the mux
 	mux := &gexMux{
 		mux:            http.NewServeMux(),
@@ -42,22 +42,22 @@ func NewApp(hostConfig HostConfig, defaultRoute http.HandlerFunc) *App {
 		Handler: mux,
 	}
 
-	return &App{
+	return &Server{
 		HostConfig: hostConfig,
 		mux:        mux,
 		server:     server,
 	}
 }
 
-func (a *App) AddRoute(path string, handler http.HandlerFunc, middleware ...Middleware) {
+func (a *Server) AddRoute(path string, handler http.HandlerFunc, middleware ...Middleware) {
 	a.mux.addRoute(path, handler, middleware...)
 }
 
-func (a *App) RegisterMiddleware(middleware Middleware) {
+func (a *Server) RegisterMiddleware(middleware Middleware) {
 	a.server.Handler = middleware(a.server.Handler)
 }
 
-func (a *App) SetupServerCORS() {
+func (a *Server) SetupServerCORS() {
 	a.server.Handler = cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},
 		AllowedMethods: []string{
@@ -74,14 +74,14 @@ func (a *App) SetupServerCORS() {
 	}).Handler(a.server.Handler)
 }
 
-func (a *App) OnShutdown(cleanupFunc func()) {
+func (a *Server) OnShutdown(cleanupFunc func()) {
 	a.onShutdown = append(a.onShutdown, cleanupFunc)
 }
 
 /**
  * Runs the server while listening for shutdown signals
  */
-func (a *App) Start() error {
+func (a *Server) Start() error {
 	// Listen for shutdown signals
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
