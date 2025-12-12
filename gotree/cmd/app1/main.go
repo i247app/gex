@@ -6,16 +6,15 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/your-org/gosvr_svr/cmd/app1/service" // Import the service package for app1.
-	"github.com/your-org/gosvr_svr/internal/config"    // Import the internal config package.
-	"github.com/your-org/gosvr_svr/internal/database"  // Import the internal database package.
-	"github.com/your-org/gosvr_svr/internal/logger"      // Import the internal logger package.
+	"github.com/your-org/gosvr_svr/cmd/app1/service"    // Import the service package for app1.
+	"github.com/your-org/gosvr_svr/internal/config"     // Import the internal config package.
+	"github.com/your-org/gosvr_svr/internal/database"   // Import the internal database package.
+	"github.com/your-org/gosvr_svr/internal/logger"     // Import the internal logger package.
 	"github.com/your-org/gosvr_svr/internal/middleware" // Import the internal middleware package.
-	"github.com/your-org/gosvr_svr/internal/service"   // Import the internal service package.
-	"github.com/your-org/gosvr_svr/internal/session"     // Import the internal session package.
+	"github.com/your-org/gosvr_svr/internal/service"    // Import the internal service package.
+	"github.com/your-org/gosvr_svr/internal/session"    // Import the internal session package.
 )
 
 func main() {
@@ -34,8 +33,8 @@ func main() {
 	}
 	defer l.Sync() // Ensure buffered logs are flushed before exiting.
 
-    // Set the global logger.
-    logger.SetLogger(l)
+	// Set the global logger.
+	logger.SetLogger(l)
 
 	// Initialize the database connection.
 	db, err := database.NewDatabase(cfg.Database)
@@ -49,7 +48,7 @@ func main() {
 	if err != nil {
 		l.Fatalf("failed to initialize session store: %v", err)
 	}
-    defer sessionStore.Close()
+	defer sessionStore.Close()
 
 	// Create the base service.  This holds common dependencies that
 	// are shared by all of the application-specific services.
@@ -62,10 +61,10 @@ func main() {
 	r := gin.New()
 
 	// Register global middleware.
-	r.Use(middleware.RequestLogger(l))     // Log every request.
-	r.Use(middleware.CORSMiddleware())       // Handle CORS headers.
+	r.Use(middleware.RequestLogger(l))                // Log every request.
+	r.Use(middleware.CORSMiddleware())                // Handle CORS headers.
 	r.Use(middleware.SessionMiddleware(sessionStore)) // Handle Sessions
-	r.Use(gin.Recovery())                 // Recover from panics.
+	r.Use(gin.Recovery())                             // Recover from panics.
 
 	// Define a simple health check endpoint.
 	r.GET("/health", func(c *gin.Context) {

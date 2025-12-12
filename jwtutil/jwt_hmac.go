@@ -32,7 +32,6 @@ func (t *HmacJwtHelper) GenerateJwt(claims jwt.Claims) (*jwt.Token, error) {
 	// You can add claims to the token here if needed
 	// For example, t.Claims = jwt.MapClaims{"user": "example"}
 
-	// Sign the token using the ECDSA private key
 	_, err := jwtToken.SignedString(t.Key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign token: %w", err)

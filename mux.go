@@ -1,6 +1,9 @@
 package gex
 
-import "net/http"
+import (
+	"net/http"
+	"slices"
+)
 
 type gexMux struct {
 	mux            *http.ServeMux
@@ -21,6 +24,8 @@ func (m *gexMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *gexMux) addRoute(path string, handler http.Handler, middleware ...Middleware) {
+	slices.Reverse(middleware)
+
 	// fmt.Printf("registering: %v\n", path)
 	for _, mw := range middleware {
 		handler = mw(handler).(http.HandlerFunc)

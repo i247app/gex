@@ -9,6 +9,10 @@ go.work.sum
 .env*
 !.env.*example
 
+# Documentation related
+CLAUDE.md
+EXPLAIN.md
+
 # Custom End Here
 
 # Standard gitignore Below
